@@ -26,10 +26,9 @@ try {
     $dotenv = Dotenv::createImmutable(__DIR__);
     $dotenv->load();
 
-    // Set response content type to JSON
     header('Content-Type: application/json');
 
-    // Return public API key in JSON response
+    error_log('[config] Public API key loaded');
     echo json_encode([
         'success' => true,
         'data' => [
@@ -37,7 +36,7 @@ try {
         ],
     ]);
 } catch (Exception $e) {
-    // Handle configuration errors
+    error_log('[config] ERROR: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'success' => false,

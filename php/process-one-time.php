@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 /**
- * Card Payment Processing Script
+ * One-Time Donation Processing Script
  *
- * This script demonstrates card payment processing using the Global Payments SDK.
- * It handles tokenized card data and billing information to process payments
- * securely through the Global Payments API.
+ * This script demonstrates one-time donation processing using the Global Payments SDK.
+ * It handles tokenized card data and billing information to process one-time donations
+ * securely through the Portico API.
  *
  * PHP version 7.4 or higher
  *
@@ -47,7 +47,7 @@ function configureSdk(): void
     $config->developerId = '000000';
     $config->versionNumber = '0000';
     $config->serviceUrl = 'https://cert.api2.heartlandportico.com';
-    
+
     ServicesContainer::configureService($config);
 }
 
@@ -64,43 +64,61 @@ function sanitizePostalCode(?string $postalCode): string
     if ($postalCode === null) {
         return '';
     }
-    
+
     $sanitized = preg_replace('/[^a-zA-Z0-9-]/', '', $postalCode);
     return substr($sanitized, 0, 10);
 }
 
-// Initialize SDK configuration
 configureSdk();
 
 try {
-    // Validate required fields
-    if (!isset($_POST['payment_token'], $_POST['billing_zip'], $_POST['amount'])) {
-        throw new ApiException('Missing required fields');
+    if (empty($inputData['payment_reference'])) {
+        throw new ApiException('Missing payment reference');
     }
-    
-    // Parse and validate amount
-    $amount = floatval($_POST['amount']);
-    if ($amount <= 0) {
+
+    if (empty($inputData['amount']) || floatval($inputData['amount']) <= 0) {
         throw new ApiException('Invalid amount');
     }
 
-    // Initialize payment data using tokenized card information
+    if (empty($inputData['first_name'])) {
+        throw new ApiException('Missing first name');
+    }
+
+    if (empty($inputData['last_name'])) {
+        throw new ApiException('Missing last name');
+    }
+
+    if (empty($inputData['donor_email'])) {
+        throw new ApiException('Missing donor email');
+    }
+
+    if (empty($inputData['billing_zip'])) {
+        throw new ApiException('Missing billing zip');
+    }
+
+    $paymentReference = $inputData['payment_reference'];
+    $amount = floatval($inputData['amount']);
+    $firstName = trim($inputData['first_name']);
+    $lastName = trim($inputData['last_name']);
+    $donorEmail = $inputData['donor_email'];
+
+    error_log('[one-time] Processing charge: amount=' . $amount . ' donor=' . $donorEmail);
+
     $card = new CreditCardData();
-    $card->token = $_POST['payment_token'];
+    $card->token = $paymentReference;
+    $card->cardHolderName = $firstName . ' ' . $lastName;
 
-    // Create billing address for AVS verification
     $address = new Address();
-    $address->postalCode = sanitizePostalCode($_POST['billing_zip']);
+    $address->postalCode = sanitizePostalCode($inputData['billing_zip']);
 
-    // Process the payment transaction with specified amount
     $response = $card->charge($amount)
         ->withAllowDuplicates(true)
         ->withCurrency('USD')
         ->withAddress($address)
         ->execute();
-    
-    // Verify transaction was successful
+
     if ($response->responseCode !== '00') {
+        error_log('[one-time] Charge declined: ' . $response->responseMessage);
         http_response_code(400);
         echo json_encode([
             'success' => false,
@@ -113,22 +131,40 @@ try {
         exit;
     }
 
-    // Return success response with transaction ID
+    error_log('[one-time] Charge success: transactionId=' . $response->transactionId . ' responseCode=' . $response->responseCode);
     echo json_encode([
         'success' => true,
-        'message' => 'Payment successful! Transaction ID: ' . $response->transactionId,
+        'message' => 'Thank you for your donation!',
         'data' => [
-            'transactionId' => $response->transactionId
+            'transactionId' => $response->transactionId,
+            'status' => $response->responseMessage,
+            'amount' => $amount,
+            'currency' => 'USD',
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'donorEmail' => $donorEmail,
+            'timestamp' => date('Y-m-d H:i:s')
         ]
     ]);
 } catch (ApiException $e) {
-    // Handle payment processing errors
+    error_log('[one-time] ApiException: ' . $e->getMessage());
     http_response_code(400);
     echo json_encode([
         'success' => false,
         'message' => 'Payment processing failed',
         'error' => [
             'code' => 'API_ERROR',
+            'details' => $e->getMessage()
+        ]
+    ]);
+} catch (\Throwable $e) {
+    error_log('[one-time] Unexpected error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'An unexpected error occurred',
+        'error' => [
+            'code' => 'SYSTEM_ERROR',
             'details' => $e->getMessage()
         ]
     ]);
