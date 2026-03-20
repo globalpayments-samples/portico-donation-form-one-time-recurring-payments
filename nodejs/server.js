@@ -9,10 +9,13 @@ import {
     Customer,
     RecurringPaymentMethod,
     ScheduleFrequency,
+    EmailReceipt,
     ApiError,
 } from 'globalpayments-api';
 
 dotenv.config();
+
+const getEnvVar = (name) => (process.env[name] ?? '').trim();
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -21,7 +24,7 @@ app.use(express.static('.'));
 app.use(express.json());
 
 const config = new PorticoConfig();
-config.secretApiKey = process.env.SECRET_API_KEY;
+config.secretApiKey = getEnvVar('SECRET_API_KEY');
 config.developerId = '000000';
 config.versionNumber = '0000';
 config.serviceUrl = 'https://cert.api2.heartlandportico.com';
@@ -42,13 +45,14 @@ const mapFrequency = (frequency) => {
 };
 
 app.get('/config', (req, res) => {
-    const publicApiKey = process.env.PUBLIC_API_KEY;
+    const publicApiKey = getEnvVar('PUBLIC_API_KEY');
     if (!publicApiKey) {
         return res.status(500).json({
             success: false,
             message: 'Payment configuration is unavailable',
         });
     }
+    console.log(`[config] Serving publicApiKey: ${publicApiKey.slice(0, 12)}***`);
     res.json({
         success: true,
         data: { publicApiKey },
@@ -175,7 +179,8 @@ async function processRecurring(body, res) {
         const firstName = body.first_name.trim();
         const lastName = body.last_name.trim();
 
-        console.log(`[recurring] Processing schedule: amount=${amount} frequency=${frequency} donor=${donorEmail}`);
+        const tokenPrefix = (body.payment_reference || '').slice(0, 12);
+        console.log(`[recurring] token=${tokenPrefix}*** name="${firstName} ${lastName}" email=${donorEmail}`);
 
         const customer = new Customer();
         customer.id = randomUUID();
@@ -205,20 +210,26 @@ async function processRecurring(body, res) {
 
         let startDate;
         if (body.start_date) {
-            startDate = new Date(body.start_date);
+            // Parse as UTC date to avoid timezone day-shift in buildDate (uses getUTCDate)
+            startDate = new Date(body.start_date + 'T00:00:00Z');
         } else {
             const now = new Date();
-            startDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const year = now.getUTCMonth() === 11 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
+            const month = (now.getUTCMonth() + 1) % 12;
+            startDate = new Date(Date.UTC(year, month, 1));
         }
 
-        const scheduleBuilder = paymentMethod.addSchedule(randomUUID())
+        const durationType = body.duration_type || '';
+        const scheduleId = randomUUID();
+        console.log(`[recurring] Creating schedule: id=${scheduleId} amount=${amount} frequency=${frequency} startDate=${startDate.toISOString().slice(0, 10)} durationType=${durationType || 'indefinite'}`);
+        const scheduleBuilder = paymentMethod.addSchedule(scheduleId)
+            .withName(scheduleId)
             .withStatus('Active')
+            .withEmailReceipt(EmailReceipt.Never)
             .withAmount(amount)
             .withCurrency('USD')
             .withStartDate(startDate)
             .withFrequency(mapFrequency(frequency));
-
-        const durationType = body.duration_type || '';
         if (durationType === 'end_date' && body.end_date) {
             scheduleBuilder.withEndDate(new Date(body.end_date));
         } else if (durationType === 'num_payments' && body.num_payments) {
@@ -249,13 +260,14 @@ async function processRecurring(body, res) {
     } catch (e) {
         if (e instanceof ApiError) {
             console.log(`[recurring] ApiException: ${e.message}`);
+            console.log(`[recurring] Heartland response: ${e.responseMessage}`);
             return res.status(400).json({
                 success: false,
                 message: 'Recurring donation setup failed',
                 error: { code: 'API_ERROR', details: e.message },
             });
         }
-        console.log(`[recurring] Unexpected error: ${e.message}`);
+        console.log(`[recurring] Unexpected error:\n${e.stack ?? e.message}`);
         return res.status(500).json({
             success: false,
             message: 'An unexpected error occurred',

@@ -109,10 +109,12 @@ Configured once at startup using `PorticoConfig`:
 2. Creates and saves a `Customer` entity with UUID-based ID
 3. Adds tokenized card as `RecurringPaymentMethod` to the customer
 4. Builds a `Schedule` with frequency and optional duration constraints
-5. Returns schedule key, customer key, and payment method key on success
+5. Sets `EmailReceipt.Never` on the schedule (required by Heartland PayPlan API)
+6. Returns schedule key, customer key, and payment method key on success
 
 ### Utility Functions
 
+- `getEnvVar(name)` — reads an environment variable, trims whitespace from the value
 - `sanitizePostalCode(postalCode)` — strips non-alphanumeric/hyphen characters, truncates to 10 chars
 - `mapFrequency(frequency)` — maps `"monthly"` / `"quarterly"` / `"annually"` to `ScheduleFrequency` SDK enums
 
@@ -128,6 +130,7 @@ Console output uses prefixed log lines for traceability:
 - `[donation]` — routing decisions
 - `[one-time]` — one-time charge processing
 - `[recurring]` — recurring schedule setup
+- On API errors, `e.responseMessage` is logged to expose the raw Heartland error body
 
 ## API Endpoints
 
