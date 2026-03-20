@@ -117,6 +117,7 @@ All logic lives in `Program.cs` organized as static methods:
 
 ### Utility Methods
 
+- `GetEnvVar(string)` — reads an environment variable, trims whitespace, and strips inline shell comments (e.g. `value  # comment` → `value`)
 - `SanitizePostalCode(string)` — strips non-alphanumeric/hyphen characters, truncates to 10 chars
 - `MapFrequency(string)` — maps `"monthly"` / `"quarterly"` / `"annually"` to `ScheduleFrequency` constants
 

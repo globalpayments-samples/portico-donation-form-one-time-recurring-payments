@@ -28,14 +28,28 @@ public class Program
         app.Run();
     }
 
+    private static string GetEnvVar(string name)
+    {
+        var value = System.Environment.GetEnvironmentVariable(name) ?? "";
+        // Strip inline shell comments (e.g. "value  #gitleaks:allow" → "value")
+        var commentIdx = value.IndexOf(" #");
+        if (commentIdx >= 0) value = value[..commentIdx];
+        return value.Trim();
+    }
+
     private static void ConfigureGlobalPaymentsSDK()
     {
+        var secretKey = GetEnvVar("SECRET_API_KEY");
+        var serviceUrl = "https://cert.api2.heartlandportico.com";
+        var keyPrefix = secretKey.Length >= 12 ? secretKey[..12] : secretKey;
+        Console.WriteLine($"[sdk] Initializing with secretKey={keyPrefix}*** serviceUrl={serviceUrl}");
+
         ServicesContainer.ConfigureService(new PorticoConfig
         {
-            SecretApiKey = System.Environment.GetEnvironmentVariable("SECRET_API_KEY"),
+            SecretApiKey = secretKey,
             DeveloperId = "000000",
             VersionNumber = "0000",
-            ServiceUrl = "https://cert.api2.heartlandportico.com"
+            ServiceUrl = serviceUrl
         });
     }
 
@@ -43,12 +57,15 @@ public class Program
     {
         app.MapGet("/config", () =>
         {
-            var publicApiKey = System.Environment.GetEnvironmentVariable("PUBLIC_API_KEY");
+            var publicApiKey = GetEnvVar("PUBLIC_API_KEY");
             if (string.IsNullOrEmpty(publicApiKey))
             {
+                Console.WriteLine("[config] ERROR: PUBLIC_API_KEY is not set or empty");
                 return Results.Json(new { success = false, message = "Payment configuration is unavailable" },
                     statusCode: 500);
             }
+            var keyPrefix = publicApiKey.Length >= 12 ? publicApiKey[..12] : publicApiKey;
+            Console.WriteLine($"[config] Serving publicApiKey: {keyPrefix}***");
             return Results.Ok(new { success = true, data = new { publicApiKey } });
         });
 
@@ -57,10 +74,12 @@ public class Program
             using var doc = await JsonDocument.ParseAsync(context.Request.Body);
             var root = doc.RootElement;
 
-            string GetStr(string key) =>
-                root.TryGetProperty(key, out var v) && v.ValueKind != JsonValueKind.Null
-                    ? v.GetString() ?? ""
-                    : "";
+            string GetStr(string key)
+            {
+                if (!root.TryGetProperty(key, out var v) || v.ValueKind == JsonValueKind.Null)
+                    return "";
+                return v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : v.ToString();
+            }
 
             var paymentType = GetStr("payment_type");
 
@@ -123,7 +142,9 @@ public class Program
             if (string.IsNullOrEmpty(billingZip))
                 throw new ApiException("Missing billing zip");
 
-            Console.WriteLine($"[one-time] Processing charge: amount={amount} donor={donorEmail}");
+            var tokenPrefix = paymentReference.Length >= 12 ? paymentReference[..12] : paymentReference;
+            Console.WriteLine($"[one-time] Processing charge: amount={amount} donor={donorEmail} token={tokenPrefix}***");
+            Console.WriteLine($"[one-time] Billing zip: {SanitizePostalCode(billingZip)}");
 
             var card = new CreditCardData
             {
@@ -142,6 +163,8 @@ public class Program
                 .WithAddress(address)
                 .Execute();
 
+            Console.WriteLine($"[one-time] Response: code={response.ResponseCode} message={response.ResponseMessage} transactionId={response.TransactionId} authCode={response.AuthorizationCode} referenceNumber={response.ReferenceNumber}");
+
             if (response.ResponseCode != "00")
             {
                 Console.WriteLine($"[one-time] Charge declined: {response.ResponseMessage}");
@@ -153,7 +176,7 @@ public class Program
                 });
             }
 
-            Console.WriteLine($"[one-time] Charge success: transactionId={response.TransactionId} responseCode=00");
+            Console.WriteLine($"[one-time] Charge success: transactionId={response.TransactionId} authCode={response.AuthorizationCode}");
             return Results.Ok(new
             {
                 success = true,
@@ -174,6 +197,7 @@ public class Program
         catch (ApiException ex)
         {
             Console.WriteLine($"[one-time] ApiException: {ex.Message}");
+            Console.WriteLine($"[one-time] StackTrace: {ex.StackTrace}");
             return Results.BadRequest(new
             {
                 success = false,
@@ -184,6 +208,7 @@ public class Program
         catch (Exception ex)
         {
             Console.WriteLine($"[one-time] Unexpected error: {ex.Message}");
+            Console.WriteLine($"[one-time] StackTrace: {ex.StackTrace}");
             return Results.Json(new
             {
                 success = false,
@@ -218,7 +243,9 @@ public class Program
             var donorEmail = GetStr("donor_email");
             var frequency = GetStr("frequency");
 
-            Console.WriteLine($"[recurring] Processing schedule: amount={amount} frequency={frequency} donor={donorEmail}");
+            var tokenPrefix = paymentReference.Length >= 12 ? paymentReference[..12] : paymentReference;
+            Console.WriteLine($"[recurring] Processing schedule: amount={amount} frequency={frequency} donor={donorEmail} token={tokenPrefix}***");
+            Console.WriteLine($"[recurring] Customer: name={firstName} {lastName} email={donorEmail}");
 
             var customer = new Customer
             {
@@ -239,7 +266,7 @@ public class Program
             };
 
             var savedCustomer = customer.Create();
-            Console.WriteLine($"[recurring] Customer created: key={savedCustomer.Key}");
+            Console.WriteLine($"[recurring] Customer created: key={savedCustomer.Key} id={savedCustomer.Id}");
 
             var card = new CreditCardData { Token = paymentReference };
             var paymentMethod = savedCustomer.AddPaymentMethod(Guid.NewGuid().ToString(), card).Create();
@@ -278,9 +305,10 @@ public class Program
                     scheduleBuilder.NumberOfPayments = numPayments;
             }
 
+            Console.WriteLine($"[recurring] Schedule params: amount={amount} frequency={frequency} startDate={startDate:yyyy-MM-dd} durationType={durationType}");
             var savedSchedule = scheduleBuilder.Create();
             var startDateFormatted = startDate.ToString("yyyy-MM-dd");
-            Console.WriteLine($"[recurring] Schedule created: key={savedSchedule.Key} startDate={startDateFormatted}");
+            Console.WriteLine($"[recurring] Schedule created: key={savedSchedule.Key} id={savedSchedule.Id} startDate={startDateFormatted}");
 
             return Results.Ok(new
             {
@@ -305,6 +333,7 @@ public class Program
         catch (ApiException ex)
         {
             Console.WriteLine($"[recurring] ApiException: {ex.Message}");
+            Console.WriteLine($"[recurring] StackTrace: {ex.StackTrace}");
             return Results.BadRequest(new
             {
                 success = false,
@@ -315,6 +344,7 @@ public class Program
         catch (Exception ex)
         {
             Console.WriteLine($"[recurring] Unexpected error: {ex.Message}");
+            Console.WriteLine($"[recurring] StackTrace: {ex.StackTrace}");
             return Results.Json(new
             {
                 success = false,
