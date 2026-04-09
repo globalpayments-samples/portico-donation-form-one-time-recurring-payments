@@ -1,160 +1,110 @@
-# PHP Donation Form — One-Time and Recurring Payments
+# PHP — Portico Donation Form (One-Time & Recurring)
 
-This example demonstrates a comprehensive donation form supporting both one-time and recurring payments using PHP and the Global Payments Portico API.
-
-## Features
-
-- **Unified Donation Form** - Single form interface for both payment types
-- **One-Time Donations** - Immediate one-time payment processing
-- **Recurring Donations** - Automated recurring billing with flexible schedules
-- **Flexible Scheduling** - Monthly, quarterly, and annual billing frequencies
-- **Duration Options** - Ongoing, end date, or specific number of payments
-- **Secure Tokenization** - PCI SAQ-A compliant via Heartland Hosted Fields
-- **Donor Management** - Customer entity creation for recurring donors
+PHP implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway. Uses Heartland Hosted Fields for PCI SAQ-A compliant tokenization — card data never touches your server.
 
 ## Requirements
 
-- PHP 7.4 or later
+- PHP 8.0+
 - Composer
-- Global Payments Portico account and API credentials
+- Global Payments Portico account with API credentials
 
 ## Project Structure
 
 ```
 php/
-├── process-donation.php      # Main router — dispatches to one-time or recurring processor
-├── process-one-time.php      # One-time payment processor
-├── process-recurring.php     # Recurring payment processor
-├── config.php                # Configuration endpoint
-├── index.html                # Donation form frontend
-├── composer.json             # Dependencies
-├── .env.sample               # Environment variable template
-├── run.sh                    # Convenience startup script
-└── Dockerfile                # Container build file
+├── config.php            # GET /config — returns publicApiKey
+├── process-donation.php  # POST /process-donation — routes by payment_type
+├── process-one-time.php  # One-time charge logic
+├── process-recurring.php # Customer → PaymentMethod → Schedule chain
+├── index.html            # Donation form frontend
+├── composer.json         # globalpayments/php-sdk + phpdotenv
+├── .env.sample
+├── Dockerfile
+├── run.sh
+├── .devcontainer/
+└── .codesandbox/
 ```
 
 ## Setup
 
-### 1. Clone and Configure
-
+**1. Install dependencies**
 ```bash
-cd php/
+composer install
+```
+
+**2. Configure credentials**
+```bash
 cp .env.sample .env
 ```
 
-### 2. Configure Environment Variables
-
-Edit `.env` with your Portico API credentials:
-
-```env
-PUBLIC_API_KEY=pkapi_cert_xxxxxxxxxxxxx
-SECRET_API_KEY=skapi_cert_xxxxxxxxxxxxx
-```
-
-**Test Credentials** (from `.env.sample`):
+Edit `.env`:
 ```env
 PUBLIC_API_KEY=pkapi_cert_jKc1FtuyAydZhZfbB3
 SECRET_API_KEY=skapi_cert_MTyMAQBiHVEAewvIzXVFcmUd2UcyBge_eCpaASUp0A
 ```
 
-### 3. Install Dependencies
-
+**3. Start the server**
 ```bash
-composer install
+php -S localhost:8000
+# Open http://localhost:8000
 ```
 
-### 4. Run the Application
-
+Or use the convenience script:
 ```bash
 ./run.sh
 ```
 
-Or manually:
-```bash
-php -S localhost:8000
+## Environment Variables
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `PUBLIC_API_KEY` | Public key for Heartland Hosted Fields (browser) | ✅ | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
+| `SECRET_API_KEY` | Secret key for server-side Portico API calls | ✅ | `skapi_cert_MTyMAQBiHVEA...` |
+
+## SDK Configuration
+
+Each processor (`process-one-time.php`, `process-recurring.php`) initializes the SDK identically:
+
+```php
+use GlobalPayments\Api\ServiceConfigs\Gateways\PorticoConfig;
+use GlobalPayments\Api\ServicesContainer;
+
+$config = new PorticoConfig();
+$config->secretApiKey = $_ENV['SECRET_API_KEY'];
+$config->developerId = '000000';
+$config->versionNumber = '0000';
+$config->serviceUrl = 'https://cert.api2.heartlandportico.com';
+
+ServicesContainer::configureService($config);
 ```
-
-Then open http://localhost:8000 in your browser.
-
-## Implementation Details
-
-### Architecture
-
-File-based router architecture:
-- `process-donation.php` reads `payment_type` and dispatches to `process-one-time.php` or `process-recurring.php`
-- `vlucas/phpdotenv ^5.5` for environment variable loading
-- `globalpayments/php-sdk ^13.1` for the Portico SDK
-
-### SDK Configuration
-
-Each processor loads credentials via `vlucas/phpdotenv` and initializes `ServicesContainer` with `PorticoConfig`:
-- `secretApiKey` from environment
-- `serviceUrl` pointed at `https://cert.api2.heartlandportico.com`
-- `developerId` and `versionNumber` set for identification
-
-### One-Time Payment Flow
-
-1. Validates required fields: `payment_reference`, `amount`, `first_name`, `last_name`, `donor_email`, `billing_zip`
-2. Creates `CreditCardData` with Hosted Fields token and cardholder name
-3. Creates `Address` with sanitized postal code
-4. Calls `$card->charge($amount)->withCurrency('USD')->execute()`
-5. Returns transaction ID on success
-
-### Recurring Payment Flow
-
-1. Validates all required fields including full address: `phone`, `street_address`, `city`, `state`, `country`
-2. Creates and saves a `Customer` entity with UUID-based ID
-3. Adds tokenized card as a `RecurringPaymentMethod` to the customer
-4. Builds a `Schedule` with frequency and optional duration constraints
-5. Default start date: first day of next month if `start_date` not provided
-6. Returns schedule key, customer key, and payment method key on success
-
-### Utility Functions
-
-Each processor includes:
-- `sanitizePostalCode($postalCode)` — strips non-alphanumeric/hyphen characters, truncates to 10 chars
-- `generateUuidV4()` — generates a UUID v4 string for customer and payment method IDs
-- `mapFrequency($frequency)` — maps `"monthly"` / `"quarterly"` / `"annually"` to `ScheduleFrequency` SDK constants
-
-### Duration Types
-
-- `"ongoing"` — no end date or payment limit set
-- `"end_date"` — `$schedule->withEndDate(new \DateTime($endDate))`
-- `"num_payments"` — `$schedule->withNumberOfPayments((int)$numPayments)`
 
 ## API Endpoints
 
 ### GET /config.php
 
-Returns public API key for Heartland Hosted Fields initialization.
+Returns the public API key for Heartland Hosted Fields initialization.
 
-**Response (success):**
+**Response:**
 ```json
 {
   "success": true,
   "data": {
-    "publicApiKey": "pkapi_cert_xxxxx"
+    "publicApiKey": "pkapi_cert_jKc1FtuyAydZhZfbB3"
   }
 }
 ```
 
-**Response (missing key, HTTP 500):**
-```json
-{
-  "success": false,
-  "message": "Payment configuration is unavailable"
-}
-```
+---
 
 ### POST /process-donation.php
 
-Routes to appropriate processor based on `payment_type`.
+Routes to `process-one-time.php` or `process-recurring.php` based on `payment_type`.
 
 **One-time request:**
 ```json
 {
   "payment_type": "one-time",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "50.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -167,7 +117,7 @@ Routes to appropriate processor based on `payment_type`.
 ```json
 {
   "payment_type": "recurring",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "25.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -179,9 +129,20 @@ Routes to appropriate processor based on `payment_type`.
   "state": "GA",
   "country": "US",
   "frequency": "monthly",
-  "duration_type": "ongoing"
+  "duration_type": "ongoing",
+  "start_date": "2025-05-01"
 }
 ```
+
+**`duration_type` options:**
+
+| Value | Additional Field | Description |
+|-------|-----------------|-------------|
+| `"ongoing"` | — | Runs indefinitely |
+| `"end_date"` | `end_date` (YYYY-MM-DD) | Stops on a specific date |
+| `"num_payments"` | `num_payments` (integer) | Stops after N payments |
+
+**`frequency` options:** `"monthly"`, `"quarterly"`, `"annually"`
 
 **One-time success response:**
 ```json
@@ -190,7 +151,8 @@ Routes to appropriate processor based on `payment_type`.
   "message": "Thank you for your donation!",
   "data": {
     "transactionId": "1234567890",
-    "amount": 50.00
+    "amount": 50.00,
+    "currency": "USD"
   }
 }
 ```
@@ -204,7 +166,8 @@ Routes to appropriate processor based on `payment_type`.
     "scheduleKey": "schedule_xxxxx",
     "customerKey": "customer_xxxxx",
     "paymentMethodKey": "pm_xxxxx",
-    "amount": 50.00,
+    "amount": 25.00,
+    "currency": "USD",
     "frequency": "monthly",
     "startDate": "2025-05-01"
   }
@@ -223,62 +186,102 @@ Routes to appropriate processor based on `payment_type`.
 }
 ```
 
-Error codes: `PAYMENT_DECLINED`, `API_ERROR`, `SYSTEM_ERROR`
+## One-Time Payment Flow
 
-## Security Considerations
+```php
+// 1. Card tokenized by Heartland.js in browser
+$token = $inputData['payment_reference'];
 
-### PCI Compliance
+// 2. Attach token to CreditCardData
+$card = new CreditCardData();
+$card->token = $token;
+$card->cardHolderName = $firstName . ' ' . $lastName;
 
-- ✅ **PCI SAQ-A Compliant** — Card data never touches your server
-- ✅ **Tokenization** — Heartland Hosted Fields handle all sensitive card data
-- ✅ **HTTPS Required** — Always use HTTPS in production
+// 3. Create billing address
+$address = new Address();
+$address->postalCode = sanitizePostalCode($billingZip);
 
-### Input Validation
+// 4. Charge through Portico
+$response = $card->charge($amount)
+    ->withCurrency('USD')
+    ->withAddress($address)
+    ->execute();
+```
 
-- ✅ Server-side validation of all required fields
-- ✅ Postal code sanitization (alphanumeric + hyphen only, max 10 chars)
-- ✅ Amount validation (must be > 0)
-- ✅ Email format validation
-- ✅ Payment type validation before routing
+## Recurring Payment Flow
 
-### Production Checklist
+```php
+// Step 1 — Create customer
+$customer = new Customer();
+$customer->id = generateUuidV4();
+$customer->firstName = $firstName;
+$customer->address = new Address();
+$customer->address->streetAddress1 = $streetAddress;
+// ... other fields ...
+$customer = $customer->create();
 
-- [ ] Replace test credentials with production API keys
-- [ ] Enable HTTPS/SSL on your server
-- [ ] Implement rate limiting on payment endpoints
-- [ ] Add CSRF protection to forms
-- [ ] Configure proper error logging
-- [ ] Set up monitoring and alerts
-- [ ] Review and update terms of service, privacy policy, and refund policy
+// Step 2 — Store payment method
+$paymentMethod = $customer->addPaymentMethod(
+    generateUuidV4(),
+    $card
+)->create();
+
+// Step 3 — Create schedule
+$schedule = $paymentMethod->addSchedule(generateUuidV4())
+    ->withStatus('Active')
+    ->withAmount($amount)
+    ->withCurrency('USD')
+    ->withFrequency(mapFrequency($frequency))  // monthly/quarterly/annually
+    ->withStartDate(new \DateTime($startDate))
+    ->create();
+```
+
+**`duration_type` mapping:**
+- `"ongoing"` — no constraint added
+- `"end_date"` — `->withEndDate(new \DateTime($endDate))`
+- `"num_payments"` — `->withNumberOfPayments((int)$numPayments)`
+
+## Test Cards
+
+| Brand | Card Number | CVV | Expiry |
+|-------|-------------|-----|--------|
+| Visa | 4012002000060016 | 123 | Any future date |
+| Mastercard | 5473500000000014 | 123 | Any future date |
+| Discover | 6011000990156527 | 123 | Any future date |
+| Amex | 372700699251018 | 1234 | Any future date |
+
+## Docker
+
+```bash
+docker build -t portico-donation-php .
+docker run -p 8003:8000 \
+  -e PUBLIC_API_KEY=your_key \
+  -e SECRET_API_KEY=your_key \
+  portico-donation-php
+# Open http://localhost:8003
+```
+
+Or via docker-compose from the project root:
+```bash
+docker-compose up php
+```
 
 ## Troubleshooting
 
-**"Error loading configuration"**
-- Check that `.env` file exists and contains valid API keys
-- Verify `composer install` completed successfully
+**Hosted Fields not loading**
+Verify `GET /config.php` returns a 200 with a valid `publicApiKey`. If it returns an error, check that `.env` exists and `composer install` completed. Restart `php -S` after editing `.env`.
 
-**"Missing required fields"**
-- Verify all form fields are being submitted
-- Check browser console for JavaScript errors
+**"Missing required fields" (400)**
+Recurring requires `phone`, `street_address`, `city`, `state`, and `country` in addition to the one-time fields. Verify all required fields are in the JSON body before posting.
 
-**"Payment processing failed"**
-- Check API credentials are correct
-- Verify you're using cert credentials with cert service URL
-- Review server error logs for detailed error messages
+**"Payment processing failed" — Portico error**
+Confirm `SECRET_API_KEY` starts with `skapi_cert_` for the certification environment. Test using the cert keys in `.env.sample`. Check PHP error logs (`error_log`) for the raw Portico exception message.
 
-**Recurring schedule not created**
-- Ensure all required recurring fields are provided
-- Verify frequency value is valid: `monthly`, `quarterly`, or `annually`
-- Check that start date format is `YYYY-MM-DD`
+**Frequency value rejected**
+`frequency` must be exactly `"monthly"`, `"quarterly"`, or `"annually"`. Any other string will not map to a valid `ScheduleFrequency` constant and will cause the request to fail before reaching Portico.
 
-## Additional Resources
+**Composer install fails**
+Requires PHP 8.0+ and Composer 2.x. Confirm with `php -v` and `composer --version`. If `ext-curl` or `ext-json` are missing, install them via your OS package manager (e.g. `apt install php-curl php-json`).
 
-- [Global Payments Developer Portal](https://developer.globalpay.com/)
-- [Portico API Documentation](https://developer.globalpay.com/ecommerce)
-- [PHP SDK on GitHub](https://github.com/globalpayments/php-sdk)
-- [Heartland Hosted Fields Guide](https://developer.globalpay.com/ecommerce/payments/sdk/heartland-hosted-fields)
-
-## Support
-
-- Email: sdksupport@globalpay.com
-- Developer Portal: https://developer.globalpay.com/
+**Schedule created but no charge taken**
+A schedule creation only records the recurring agreement — it does not immediately charge the donor. The first charge occurs on `start_date`. If `start_date` was omitted, the default is the first day of the following month.

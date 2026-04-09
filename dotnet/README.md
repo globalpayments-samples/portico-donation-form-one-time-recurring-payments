@@ -1,172 +1,115 @@
-# .NET Donation Form — One-Time and Recurring Payments
+# .NET — Portico Donation Form (One-Time & Recurring)
 
-This example demonstrates a comprehensive donation form supporting both one-time and recurring payments using ASP.NET Core 9.0 and the Global Payments Portico API.
-
-## Features
-
-- **One-Time Donations** - Immediate charge via tokenized card
-- **Recurring Donations** - Customer → RecurringPaymentMethod → Schedule entity chain
-- **Flexible Scheduling** - Monthly, quarterly, and annual billing frequencies
-- **Duration Options** - Ongoing, end date, or specific number of payments
-- **Secure Tokenization** - PCI SAQ-A compliant via Heartland Hosted Fields
+ASP.NET Core implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway. Uses Heartland Hosted Fields for PCI SAQ-A compliant tokenization — card data never touches your server.
 
 ## Requirements
 
-- .NET 9.0
-- Global Payments Portico account and API credentials
+- .NET 9.0+
+- Global Payments Portico account with API credentials
 
 ## Project Structure
 
 ```
 dotnet/
-├── Program.cs            # ASP.NET Core Minimal API with all payment logic
+├── Program.cs          # ASP.NET Core minimal API — all endpoints and payment logic
 ├── wwwroot/
-│   └── index.html        # Donation form frontend (served as static files)
-├── dotnet.csproj         # Project file with dependencies
-├── appsettings.json      # Application configuration
-├── .env.sample           # Environment variable template
-├── run.sh                # Convenience startup script
-└── Dockerfile            # Container build file
+│   └── index.html      # Donation form frontend (served as static file)
+├── appsettings.json    # ASP.NET Core app settings
+├── dotnet.csproj       # GlobalPayments.Api + dotenv.net
+├── .env.sample
+├── Dockerfile
+├── run.sh
+├── .devcontainer/
+└── .codesandbox/
 ```
 
 ## Setup
 
-### 1. Clone and Configure
-
+**1. Restore dependencies**
 ```bash
-cd dotnet/
+dotnet restore
+```
+
+**2. Configure credentials**
+```bash
 cp .env.sample .env
 ```
 
-### 2. Configure Environment Variables
-
-Edit `.env` with your Portico API credentials:
-
-```env
-PUBLIC_API_KEY=pkapi_cert_xxxxxxxxxxxxx
-SECRET_API_KEY=skapi_cert_xxxxxxxxxxxxx
-```
-
-**Test Credentials** (from `.env.sample`):
+Edit `.env`:
 ```env
 PUBLIC_API_KEY=pkapi_cert_jKc1FtuyAydZhZfbB3
 SECRET_API_KEY=skapi_cert_MTyMAQBiHVEAewvIzXVFcmUd2UcyBge_eCpaASUp0A
 ```
 
-### 3. Restore Dependencies
-
+**3. Start the server**
 ```bash
-dotnet restore
+dotnet run
+# Open http://localhost:5000
 ```
 
-### 4. Run the Application
-
+Or use the convenience script:
 ```bash
 ./run.sh
 ```
 
-Or manually:
-```bash
-dotnet run
+## Environment Variables
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `PUBLIC_API_KEY` | Public key for Heartland Hosted Fields (browser) | ✅ | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
+| `SECRET_API_KEY` | Secret key for server-side Portico API calls | ✅ | `skapi_cert_MTyMAQBiHVEA...` |
+
+## SDK Configuration
+
+Configured once at startup in `Program.cs`:
+
+```csharp
+using GlobalPayments.Api;
+using GlobalPayments.Api.ServiceConfigs.Gateways;
+using dotenv.net;
+
+DotEnv.Load();
+
+private static void ConfigureGlobalPaymentsSDK()
+{
+    var config = new PorticoConfig
+    {
+        SecretApiKey = GetEnvVar("SECRET_API_KEY"),
+        DeveloperId = "000000",
+        VersionNumber = "0000",
+        ServiceUrl = "https://cert.api2.heartlandportico.com"
+    };
+    ServicesContainer.Configure(config);
+}
 ```
-
-Then open http://localhost:8000 in your browser.
-
-## Implementation Details
-
-### Architecture
-
-ASP.NET Core 9.0 Minimal API (no controllers):
-- Port 8000 (configurable via `PORT` environment variable)
-- `DotEnv.Net 3.2.1` for environment variable loading
-- `GlobalPayments.Api 9.0.16` for the Portico SDK
-- Static files served from the `wwwroot/` directory
-
-### Application Structure
-
-All logic lives in `Program.cs` organized as static methods:
-- `Main()` — bootstraps the app, loads env, configures SDK and endpoints
-- `ConfigureGlobalPaymentsSDK()` — initializes `ServicesContainer` with `PorticoConfig`
-- `ConfigureEndpoints(app)` — registers `GET /config` and `POST /process-donation` routes
-- `ProcessOneTime(root, GetStr)` — one-time charge handler
-- `ProcessRecurring(root, GetStr)` — recurring schedule handler
-
-### SDK Configuration
-
-`ConfigureGlobalPaymentsSDK()` sets up `PorticoConfig`:
-- `SecretApiKey` from environment
-- `ServiceUrl` pointed at `https://cert.api2.heartlandportico.com`
-- `DeveloperId` and `VersionNumber` set for identification
-
-### One-Time Payment Flow
-
-1. Validates required fields: `payment_reference`, `amount`, `first_name`, `last_name`, `donor_email`, `billing_zip`
-2. Creates `CreditCardData` with Hosted Fields token and cardholder name
-3. Creates `Address` with sanitized postal code
-4. Calls `card.Charge(amount).WithCurrency("USD").Execute()`
-5. Returns transaction ID on success
-
-### Recurring Payment Flow
-
-1. Validates all required fields including full address: `phone`, `street_address`, `city`, `state`, `country`
-2. Creates and saves a `Customer` entity with GUID-based ID
-3. Adds tokenized card as a `RecurringPaymentMethod` to the customer
-4. Builds a `Schedule` with frequency and optional duration constraints
-5. Default start date: first day of next month if `start_date` not provided
-6. Returns schedule key, customer key, and payment method key on success
-
-### Utility Methods
-
-- `GetEnvVar(string)` — reads an environment variable, trims whitespace, and strips inline shell comments (e.g. `value  # comment` → `value`)
-- `SanitizePostalCode(string)` — strips non-alphanumeric/hyphen characters, truncates to 10 chars
-- `MapFrequency(string)` — maps `"monthly"` / `"quarterly"` / `"annually"` to `ScheduleFrequency` constants
-
-### Duration Types
-
-- `"ongoing"` — no end date or payment limit set
-- `"end_date"` — sets `scheduleBuilder.EndDate`
-- `"num_payments"` — sets `scheduleBuilder.NumberOfPayments`
-
-### Structured Logging
-
-Console output uses prefixed log lines for traceability:
-- `[donation]` — routing decisions
-- `[one-time]` — one-time charge processing
-- `[recurring]` — recurring schedule setup
 
 ## API Endpoints
 
 ### GET /config
 
-Returns public API key for Heartland Hosted Fields initialization.
+Returns the public API key for Heartland Hosted Fields initialization.
 
-**Response (success):**
+**Response:**
 ```json
 {
   "success": true,
   "data": {
-    "publicApiKey": "pkapi_cert_xxxxx"
+    "publicApiKey": "pkapi_cert_jKc1FtuyAydZhZfbB3"
   }
 }
 ```
 
-**Response (missing key, HTTP 500):**
-```json
-{
-  "success": false,
-  "message": "Payment configuration is unavailable"
-}
-```
+---
 
 ### POST /process-donation
 
-Routes to appropriate processor based on `payment_type`.
+Routes to one-time or recurring logic based on `payment_type`.
 
 **One-time request:**
 ```json
 {
   "payment_type": "one-time",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "50.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -179,7 +122,7 @@ Routes to appropriate processor based on `payment_type`.
 ```json
 {
   "payment_type": "recurring",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "25.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -191,9 +134,20 @@ Routes to appropriate processor based on `payment_type`.
   "state": "GA",
   "country": "US",
   "frequency": "monthly",
-  "duration_type": "ongoing"
+  "duration_type": "ongoing",
+  "start_date": "2025-05-01"
 }
 ```
+
+**`duration_type` options:**
+
+| Value | Additional Field | Description |
+|-------|-----------------|-------------|
+| `"ongoing"` | — | Runs indefinitely |
+| `"end_date"` | `end_date` (YYYY-MM-DD) | Stops on a specific date |
+| `"num_payments"` | `num_payments` (integer) | Stops after N payments |
+
+**`frequency` options:** `"monthly"`, `"quarterly"`, `"annually"`
 
 **One-time success response:**
 ```json
@@ -202,13 +156,8 @@ Routes to appropriate processor based on `payment_type`.
   "message": "Thank you for your donation!",
   "data": {
     "transactionId": "1234567890",
-    "status": "Approved",
     "amount": 50.00,
-    "currency": "USD",
-    "firstName": "Jane",
-    "lastName": "Doe",
-    "donorEmail": "jane@example.com",
-    "timestamp": "2025-04-15 10:30:00"
+    "currency": "USD"
   }
 }
 ```
@@ -225,11 +174,7 @@ Routes to appropriate processor based on `payment_type`.
     "amount": 25.00,
     "currency": "USD",
     "frequency": "monthly",
-    "startDate": "2025-05-01",
-    "firstName": "Jane",
-    "lastName": "Doe",
-    "donorEmail": "jane@example.com",
-    "timestamp": "2025-04-15 10:30:00"
+    "startDate": "2025-05-01"
   }
 }
 ```
@@ -246,40 +191,100 @@ Routes to appropriate processor based on `payment_type`.
 }
 ```
 
-Error codes: `PAYMENT_DECLINED`, `API_ERROR`, `SYSTEM_ERROR`
+## One-Time Payment Flow
 
-## Security Considerations
+```csharp
+var card = new CreditCardData
+{
+    Token = paymentReference,
+    CardHolderName = $"{firstName} {lastName}"
+};
 
-### PCI Compliance
+var address = new Address { PostalCode = SanitizePostalCode(billingZip) };
 
-- ✅ **PCI SAQ-A Compliant** — Card data never touches your server
-- ✅ **Tokenization** — Heartland Hosted Fields handle all sensitive card data
-- ✅ **HTTPS Required** — Always use HTTPS in production
+var response = await card.Charge(amount)
+    .WithCurrency("USD")
+    .WithAddress(address)
+    .Execute();
 
-### Input Validation
+return new { transactionId = response.TransactionId };
+```
 
-- ✅ Server-side validation of all required fields
-- ✅ Postal code sanitization (alphanumeric + hyphen only, max 10 chars)
-- ✅ Amount validation (must be > 0, must parse as decimal)
-- ✅ Payment type validation before routing
+## Recurring Payment Flow
 
-### Production Checklist
+```csharp
+// Step 1 — Create customer
+var customer = new Customer
+{
+    Id = Guid.NewGuid().ToString(),
+    FirstName = firstName,
+    Email = donorEmail,
+    Address = new Address { StreetAddress1 = streetAddress, ... }
+};
+var savedCustomer = customer.Create();
 
-- [ ] Replace test credentials with production API keys
-- [ ] Enable HTTPS/SSL on your server
-- [ ] Implement rate limiting on payment endpoints
-- [ ] Add CSRF protection to forms
-- [ ] Configure proper error logging
-- [ ] Set up monitoring and alerts
+// Step 2 — Store payment method
+var savedMethod = savedCustomer
+    .AddPaymentMethod(Guid.NewGuid().ToString(), card)
+    .Create();
 
-## Additional Resources
+// Step 3 — Create schedule
+var schedule = savedMethod.AddSchedule(Guid.NewGuid().ToString())
+    .WithStatus("Active")
+    .WithAmount(amount)
+    .WithCurrency("USD")
+    .WithFrequency(MapFrequency(frequency))
+    .WithStartDate(DateTime.Parse(startDate));
 
-- [Global Payments Developer Portal](https://developer.globalpay.com/)
-- [Portico API Documentation](https://developer.globalpay.com/ecommerce)
-- [.NET SDK on NuGet](https://www.nuget.org/packages/GlobalPayments.Api)
-- [Heartland Hosted Fields Guide](https://developer.globalpay.com/ecommerce/payments/sdk/heartland-hosted-fields)
+// Apply duration constraint
+if (durationType == "end_date")     schedule.WithEndDate(DateTime.Parse(endDate));
+if (durationType == "num_payments") schedule.WithNumberOfPayments(numPayments);
 
-## Support
+var savedSchedule = schedule.Create();
+```
 
-- Email: sdksupport@globalpay.com
-- Developer Portal: https://developer.globalpay.com/
+## Test Cards
+
+| Brand | Card Number | CVV | Expiry |
+|-------|-------------|-----|--------|
+| Visa | 4012002000060016 | 123 | Any future date |
+| Mastercard | 5473500000000014 | 123 | Any future date |
+| Discover | 6011000990156527 | 123 | Any future date |
+| Amex | 372700699251018 | 1234 | Any future date |
+
+## Docker
+
+```bash
+docker build -t portico-donation-dotnet .
+docker run -p 8006:8000 \
+  -e ASPNETCORE_URLS=http://+:8000 \
+  -e PUBLIC_API_KEY=your_key \
+  -e SECRET_API_KEY=your_key \
+  portico-donation-dotnet
+# Open http://localhost:8006
+```
+
+Or via docker-compose from the project root:
+```bash
+docker-compose up dotnet
+```
+
+## Troubleshooting
+
+**Hosted Fields not loading**
+Verify `GET /config` returns a 200 with a valid `publicApiKey`. If it fails, confirm `.env` is present and `PUBLIC_API_KEY` is set. The SDK reads env vars at startup via `DotEnv.Load()` — restart `dotnet run` after editing `.env`.
+
+**"Missing required fields" (400)**
+Recurring requires additional fields beyond one-time: `phone`, `street_address`, `city`, `state`, `country`. Confirm all required fields are in the JSON body.
+
+**"Payment processing failed" — Portico error**
+Confirm `SECRET_API_KEY` starts with `skapi_cert_`. The `GetEnvVar()` helper strips inline comments (e.g. `#gitleaks:allow`) automatically. Check the server console for the raw Portico exception message.
+
+**`dotnet run` fails with package error**
+Verify .NET 9+ is installed: `dotnet --version`. Run `dotnet restore` to pull fresh packages. If `GlobalPayments.Api` restore fails, clear the NuGet cache: `dotnet nuget locals all --clear`.
+
+**Static files not served (index.html 404)**
+The frontend is served from `wwwroot/`. Ensure `app.UseStaticFiles()` and `app.UseDefaultFiles()` are both present in `Program.cs` and that `wwwroot/index.html` exists.
+
+**Schedule created but no immediate charge**
+Recurring schedule creation does not charge the donor immediately. The first charge occurs on `start_date`. If omitted, the default is the first day of the following month.
