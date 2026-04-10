@@ -162,7 +162,6 @@ Routes to the one-time or recurring processor based on `payment_type`.
 ```
 
 **Recurring request:**
-**Recurring request:**
 ```json
 {
   "payment_type": "recurring",
@@ -271,7 +270,7 @@ Returns scheduleKey identifying the active recurring billing agreement.
 | `PUBLIC_API_KEY` | Public key for Heartland Hosted Fields (browser) | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
 | `SECRET_API_KEY` | Secret key for server-side Portico API calls | `skapi_cert_MTyMAQBiHVEA...` |
 
-Obtain credentials from your [Global Payments developer account](https://developer.globalpay.com/).
+Obtain credentials from your [Global Payments developer account](https://developer.globalpayments.com/).
 
 ## Test Cards
 
@@ -282,7 +281,7 @@ Obtain credentials from your [Global Payments developer account](https://develop
 | Discover | 6011000990156527 | 123 | Any future date |
 | Amex | 372700699251018 | 1234 | Any future date |
 
-Additional test cards: [developer.globalpay.com/resources/test-cards](https://developer.globalpay.com/resources/test-cards)
+Additional test cards: [developer.globalpayments.com/resources/test-cards](https://developer.globalpayments.com/resources/test-cards)
 
 ## Project Structure
 
@@ -346,10 +345,10 @@ Requires Java 17+ and Maven 3.8+. Run `java -version` and `mvn -v`. If dependenc
 
 ## External Resources
 
-- [Global Payments Developer Portal](https://developer.globalpay.com/)
-- [Heartland Hosted Fields Guide](https://developer.globalpay.com/ecommerce/payments/sdk/heartland-hosted-fields)
-- [Portico API Documentation](https://developer.globalpay.com/ecommerce)
-- [Test Cards](https://developer.globalpay.com/resources/test-cards)
+- [Global Payments Developer Portal](https://developer.globalpayments.com/)
+- [Heartland Hosted Fields Guide](https://developer.globalpayments.com/api/references-overview)
+- [Portico API Documentation](https://developer.globalpayments.com/api/references-overview)
+- [Test Cards](https://developer.globalpayments.com/resources/test-cards)
 
 ## License
 
