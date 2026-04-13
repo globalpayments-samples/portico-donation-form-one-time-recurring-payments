@@ -189,7 +189,7 @@ Routes to `process-one-time.php` or `process-recurring.php` based on `payment_ty
 ## One-Time Payment Flow
 
 ```php
-// 1. Card tokenized by Heartland.js in browser
+// 1. Card tokenized by globalpayments.js in browser
 $token = $inputData['payment_reference'];
 
 // 2. Attach token to CreditCardData

@@ -19,7 +19,7 @@ Browser                        Backend                         Portico API
    │── GET /config ───────────────>│                               │
    │<─ { publicApiKey } ───────────│                               │
    │                               │                               │
-   │  [Heartland.js loads]         │                               │
+   │  [globalpayments.js loads]         │                               │
    │  [User fills donation form]   │                               │
    │  [Hosted Fields tokenize]     │                               │
    │                               │                               │
@@ -287,7 +287,7 @@ Additional test cards: [developer.globalpayments.com/resources/test-cards](https
 
 ```
 portico-donation-form-one-time-recurring-payments/
-├── index.html              # Shared frontend (Heartland.js + donation form)
+├── index.html              # Shared frontend (globalpayments.js + donation form)
 ├── docker-compose.yml      # Multi-service Docker config
 ├── README.md               # This file
 ├── LICENSE
