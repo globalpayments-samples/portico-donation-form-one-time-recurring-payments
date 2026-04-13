@@ -1,6 +1,6 @@
 # Portico Donation Form — One-Time and Recurring Payments
 
-Complete implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway across 4 programming languages. Uses Heartland Hosted Fields for PCI SAQ-A compliant card tokenization — card data never touches your server.
+Complete implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway across 4 programming languages. Uses GlobalPayments Hosted Fields for PCI SAQ-A compliant card tokenization — card data never touches your server. All implementations use the official Global Payments SDK (`PorticoConfig`).
 
 ## Available Implementations
 
@@ -130,7 +130,7 @@ docker-compose up php
 
 ### GET /config
 
-Returns the public API key for Heartland Hosted Fields initialization.
+Returns the public API key for GlobalPayments Hosted Fields initialization.
 
 **Response:**
 ```json
@@ -267,7 +267,7 @@ Returns scheduleKey identifying the active recurring billing agreement.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `PUBLIC_API_KEY` | Public key for Heartland Hosted Fields (browser) | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
+| `PUBLIC_API_KEY` | Public key for GlobalPayments Hosted Fields (browser) | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
 | `SECRET_API_KEY` | Secret key for server-side Portico API calls | `skapi_cert_MTyMAQBiHVEA...` |
 
 Obtain credentials from your [Global Payments developer account](https://developer.globalpayments.com/).
@@ -346,7 +346,7 @@ Requires Java 17+ and Maven 3.8+. Run `java -version` and `mvn -v`. If dependenc
 ## External Resources
 
 - [Global Payments Developer Portal](https://developer.globalpayments.com/)
-- [Heartland Hosted Fields Guide](https://developer.globalpayments.com/api/references-overview)
+- [GlobalPayments Hosted Fields Guide](https://developer.globalpayments.com/api/references-overview)
 - [Portico API Documentation](https://developer.globalpayments.com/api/references-overview)
 - [Test Cards](https://developer.globalpayments.com/resources/test-cards)
 

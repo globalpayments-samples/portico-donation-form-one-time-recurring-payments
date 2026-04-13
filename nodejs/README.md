@@ -1,6 +1,6 @@
 # Node.js — Portico Donation Form (One-Time & Recurring)
 
-Node.js/Express implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway. Uses Heartland Hosted Fields for PCI SAQ-A compliant tokenization — card data never touches your server.
+Node.js/Express implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway. Uses GlobalPayments Hosted Fields for PCI SAQ-A compliant tokenization — card data never touches your server.
 
 ## Requirements
 
@@ -56,7 +56,7 @@ Or use the convenience script:
 
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
-| `PUBLIC_API_KEY` | Public key for Heartland Hosted Fields (browser) | ✅ | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
+| `PUBLIC_API_KEY` | Public key for GlobalPayments Hosted Fields (browser) | ✅ | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
 | `SECRET_API_KEY` | Secret key for server-side Portico API calls | ✅ | `skapi_cert_MTyMAQBiHVEA...` |
 | `PORT` | Server port | ❌ | `8000` (default) |
 
@@ -90,7 +90,7 @@ ServicesContainer.configureService(config);
 
 ### GET /config
 
-Returns the public API key for Heartland Hosted Fields initialization.
+Returns the public API key for GlobalPayments Hosted Fields initialization.
 
 **Response:**
 ```json
