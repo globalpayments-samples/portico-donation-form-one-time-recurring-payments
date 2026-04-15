@@ -1,172 +1,164 @@
-# Portico Donation Form — One-Time & Recurring Payments
+# Portico Donation Form — One-Time and Recurring Payments
 
-A comprehensive multi-language demonstration of donation payment processing using the Global Payments Portico API. This example showcases both one-time and recurring donation flows with Heartland Hosted Fields for PCI SAQ-A compliant card tokenization, donor management, and automated recurring billing schedules.
+Complete implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway across 4 programming languages. Uses GlobalPayments Hosted Fields for PCI SAQ-A compliant card tokenization — card data never touches your server. All implementations use the official Global Payments SDK (`PorticoConfig`).
 
-## 🚀 Features
+## Available Implementations
 
-### Core Payment Capabilities
-- **One-Time Donations** - Immediate card charges for single donations
-- **Recurring Donations** - Automated recurring billing with customer and schedule management
-- **Heartland Hosted Fields** - PCI SAQ-A compliant client-side card tokenization
-- **Flexible Scheduling** - Monthly, quarterly, and annual billing frequencies
-- **Duration Options** - Ongoing, end date, or fixed number of payments
-- **Donor Management** - Automatic customer entity creation for recurring donors
+| Language | Framework | SDK |
+|----------|-----------|-----|
+| [**PHP**](./php/) | Built-in Server | globalpayments/php-sdk |
+| [**Node.js**](./nodejs/) | Express.js | globalpayments-api |
+| [**.NET**](./dotnet/) | ASP.NET Core | GlobalPayments.Api |
+| [**Java**](./java/) | Jakarta Servlet | com.globalpayments:java-sdk |
 
-### Development & Testing
-- **Portico Sandbox** - Full certification environment for development
-- **Heartland Test Cards** - Built-in test card numbers for sandbox testing
-- **Comprehensive Web Interface** - Unified donation form for both payment types
-- **Consistent API Design** - Identical endpoints and behavior across all implementations
+Preview links (runs in browser via CodeSandbox):
+- [PHP Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/php)
+- [Node.js Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/nodejs)
+- [.NET Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/dotnet)
+- [Java Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/java)
 
-### Technical Features
-- **Single Endpoint Processing** - Routes one-time and recurring donations through `/process-donation`
-- **Customer + Schedule Creation** - Automatically creates Portico customer, payment method, and schedule entities
-- **Hosted Fields Tokenization** - Card data never touches your server
-- **Environment Configuration** - Secure credential management with .env files
+## How It Works
 
-## 🌐 Available Implementations
+```
+Browser                        Backend                         Portico API
+   │                               │                               │
+   │── GET /config ───────────────>│                               │
+   │<─ { publicApiKey } ───────────│                               │
+   │                               │                               │
+   │  [globalpayments.js loads]         │                               │
+   │  [User fills donation form]   │                               │
+   │  [Hosted Fields tokenize]     │                               │
+   │                               │                               │
+   │── POST /process-donation ────>│                               │
+   │   payment_type: "one-time"    │                               │
+   │   payment_reference: token    │── card.charge() ─────────────>│
+   │   amount, name, email, zip    │<─ { transactionId } ──────────│
+   │<─ { transactionId } ──────────│                               │
+   │                               │                               │
+   │   OR                          │                               │
+   │                               │                               │
+   │── POST /process-donation ────>│                               │
+   │   payment_type: "recurring"   │── Customer.create() ─────────>│
+   │   + full address, frequency   │── addPaymentMethod() ─────────>│
+   │   + duration_type             │── addSchedule() ──────────────>│
+   │<─ { scheduleKey, customerKey }│<─ { scheduleKey } ────────────│
+```
 
-Each implementation provides identical functionality with language-specific best practices:
+## Payment Type Comparison
 
-| Language | Framework | Requirements | Status |
-|----------|-----------|--------------|--------|
-| **[PHP](./php/)** - ([Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/php)) | Native PHP | PHP 7.4+, Composer | ✅ Complete |
-| **[Node.js](./nodejs/)** - ([Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/nodejs)) | Express.js | Node.js 18+, npm | ✅ Complete |
-| **[.NET](./dotnet/)** - ([Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/dotnet)) | ASP.NET Core | .NET 9.0+ | ✅ Complete |
-| **[Java](./java/)** - ([Preview](https://githubbox.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/tree/main/java)) | Jakarta EE | Java 11+, Maven | ✅ Complete |
+| Feature | One-Time | Recurring |
+|---------|----------|-----------|
+| Required fields | name, email, zip, amount | name, email, full address, phone, amount, frequency |
+| Backend entities | `CreditCardData` → `charge()` | `Customer` → `RecurringPaymentMethod` → `Schedule` |
+| Response | `transactionId` | `scheduleKey` + `customerKey` + `paymentMethodKey` |
+| Duration options | N/A | Ongoing, end date, number of payments |
+| Frequencies | N/A | Monthly, quarterly, annually |
 
-## 🏗️ Architecture Overview
+## Prerequisites
 
-### Frontend Architecture
-- **Heartland Hosted Fields** - Secure card data capture via hosted payment fields
-- **Unified Donation Form** - Single form supporting both one-time and recurring donations
-- **Real-Time Validation** - Client-side form validation and donation type switching
-- **Responsive Design** - Clean interface with amount presets and frequency selection
+- Global Payments Portico developer account
+- Portico API credentials (`PUBLIC_API_KEY` and `SECRET_API_KEY`)
+- Docker, or runtime for your chosen language (PHP 8.0+, Node.js 18+, .NET 9+, Java 17+)
 
-### Backend Architecture
-- **RESTful API Design** - Consistent endpoints across all implementations
-- **Token-Based Processing** - Server charges the token from Heartland Hosted Fields
-- **Recurring Entity Management** - Creates customer, payment method, and schedule in Portico
-- **Error Handling** - Structured responses with categorized error codes (`PAYMENT_DECLINED`, `API_ERROR`, `SYSTEM_ERROR`)
+## Quick Start
 
-### API Endpoints
+### 1. Clone the Repository
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/config` | Return public API key for Hosted Fields initialization |
-| `POST` | `/process-donation` | Process one-time or recurring donation |
+```bash
+git clone https://github.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments.git
+cd portico-donation-form-one-time-recurring-payments
+```
 
-## 🚀 Quick Start
+### 2. Choose a Language and Configure
 
-### Prerequisites
-- Global Payments Portico account with API credentials ([Sign up here](https://developer.globalpay.com/))
-- Development environment for your chosen language
-- Package manager (npm, composer, maven, or dotnet)
+```bash
+cd php   # or nodejs, dotnet, java
+cp .env.sample .env
+```
 
-### Setup Instructions
+Edit `.env`:
+```env
+PUBLIC_API_KEY=pkapi_cert_your_key_here
+SECRET_API_KEY=skapi_cert_your_key_here
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments.git
-   cd portico-donation-form-one-time-recurring-payments
-   ```
+### 3. Install, Build, and Run
 
-2. **Choose your implementation**
-   ```bash
-   cd php  # or nodejs, dotnet, java
-   ```
+**PHP:**
+```bash
+composer install && php -S localhost:8000
+```
 
-3. **Configure environment**
-   ```bash
-   cp .env.sample .env
-   # Edit .env with your Portico credentials:
-   # PUBLIC_API_KEY=pkapi_cert_xxxxx
-   # SECRET_API_KEY=skapi_cert_xxxxx
-   ```
+**Node.js:**
+```bash
+npm install && npm start
+```
 
-4. **Install dependencies and run**
-   ```bash
-   ./run.sh
-   ```
+**.NET:**
+```bash
+dotnet restore && dotnet run
+```
 
-   Or manually per language:
-   ```bash
-   # PHP
-   composer install && php -S localhost:8000
+**Java:**
+```bash
+mvn clean package && mvn cargo:run
+```
 
-   # Node.js
-   npm install && npm start
+### 4. Test a Donation
 
-   # .NET
-   dotnet restore && dotnet run
+1. Open the app in your browser
+2. Enter a donation amount
+3. Select **One-Time** or **Recurring**
+4. Fill in donor info and enter a test card
+5. Submit and verify the response
 
-   # Java
-   mvn clean compile cargo:run
-   ```
+## Docker Setup
 
-5. **Access the application**
-   Open [http://localhost:8000](http://localhost:8000) in your browser
+```bash
+cp php/.env.sample .env   # all languages share the same variables
 
-## 🧪 Development & Testing
+docker-compose up
+```
 
-### Test Cards (Portico Sandbox)
+| Service | External Port | URL |
+|---------|--------------|-----|
+| nodejs  | 8001 | http://localhost:8001 |
+| php     | 8003 | http://localhost:8003 |
+| java    | 8004 | http://localhost:8004 |
+| dotnet  | 8006 | http://localhost:8006 |
 
-| Card | Number | CVV | Expiry |
-|------|--------|-----|--------|
-| **Visa** | 4012002000060016 | 123 | 12/2028 |
-| **MasterCard** | 2223000010005780 | 123 | 12/2028 |
-| **Discover** | 6011000990156527 | 123 | 12/2028 |
-| **Amex** | 372700699251018 | 1234 | 12/2028 |
+Run a single service:
+```bash
+docker-compose up php
+```
 
-### Duration Configuration
-
-| Duration Type | Additional Field | Description |
-|---------------|-----------------|-------------|
-| `ongoing` | None | Charges indefinitely until manually cancelled |
-| `end_date` | `end_date` (YYYY-MM-DD) | Stops on the specified date |
-| `num_payments` | `num_payments` (integer) | Stops after N payments |
-
-## 💳 Payment Flow
-
-### One-Time Donation
-1. Donor enters amount and card details via Hosted Fields
-2. Hosted Fields tokenizes card data client-side
-3. Frontend sends token + amount to `POST /process-donation` with `payment_type: "one-time"`
-4. Backend charges token via Portico SDK
-5. Returns transaction ID and confirmation
-
-### Recurring Donation
-1. Donor enters amount, frequency, duration, and card details
-2. Hosted Fields tokenizes card data client-side
-3. Frontend sends token + recurring params to `POST /process-donation` with `payment_type: "recurring"`
-4. Backend creates Portico customer entity with donor information
-5. Backend creates payment method linked to customer
-6. Backend creates recurring schedule with frequency and duration
-7. Returns schedule key, customer key, and payment method key
-
-## 🔧 API Reference
+## API Endpoints
 
 ### GET /config
 
-Returns the public API key for Heartland Hosted Fields initialization.
+Returns the public API key for GlobalPayments Hosted Fields initialization.
 
 **Response:**
 ```json
 {
   "success": true,
   "data": {
-    "publicApiKey": "pkapi_cert_xxxxx"
+    "publicApiKey": "pkapi_cert_jKc1FtuyAydZhZfbB3"
   }
 }
 ```
 
+---
+
 ### POST /process-donation
+
+Routes to the one-time or recurring processor based on `payment_type`.
 
 **One-time request:**
 ```json
 {
   "payment_type": "one-time",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "50.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -179,7 +171,7 @@ Returns the public API key for Heartland Hosted Fields initialization.
 ```json
 {
   "payment_type": "recurring",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "25.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -193,6 +185,29 @@ Returns the public API key for Heartland Hosted Fields initialization.
   "frequency": "monthly",
   "duration_type": "ongoing",
   "start_date": "2025-05-01"
+}
+```
+
+**`duration_type` options:**
+
+| Value | Additional Field | Description |
+|-------|-----------------|-------------|
+| `"ongoing"` | — | No end date, runs indefinitely |
+| `"end_date"` | `end_date` (YYYY-MM-DD) | Stops on a specific date |
+| `"num_payments"` | `num_payments` (integer) | Stops after N payments |
+
+**`frequency` options:** `"monthly"`, `"quarterly"`, `"annually"`
+
+**One-time success response:**
+```json
+{
+  "success": true,
+  "message": "Thank you for your donation!",
+  "data": {
+    "transactionId": "1234567890",
+    "amount": 50.00,
+    "currency": "USD"
+  }
 }
 ```
 
@@ -213,43 +228,144 @@ Returns the public API key for Heartland Hosted Fields initialization.
 }
 ```
 
-## 🔧 Customization
+**Error response:**
+```json
+{
+  "success": false,
+  "message": "Payment processing failed",
+  "error": {
+    "code": "API_ERROR",
+    "details": "Error message details"
+  }
+}
+```
 
-### Extending Functionality
-Each implementation provides a solid foundation for:
-- **Custom Donation Amounts** - Modify presets and currency options
-- **Donor Receipts** - Add email confirmation and tax receipt generation
-- **Campaign Integration** - Associate donations with fundraising campaigns
-- **Donor Portal** - Add schedule management and payment history views
-- **Reporting** - Add donation analytics and export capabilities
+Error codes: `PAYMENT_DECLINED`, `API_ERROR`, `SYSTEM_ERROR`
 
-### Production Considerations
-Before deploying to production:
-- **Security** - Store credentials in `.env`, never commit to version control
-- **HTTPS** - Always use HTTPS in production environments
-- **PCI Compliance** - Hosted Fields handles card data; maintain SAQ-A compliance
-- **Logging** - Add secure logging with PII protection
-- **Error Handling** - Implement comprehensive error recovery and donor notifications
+## Recurring Donation Flow
 
-## 🤝 Contributing
+Server-side recurring setup follows a three-step entity chain on every call:
 
-This project serves as a reference implementation for Portico donation form integration. When contributing:
-- Maintain consistency across all language implementations
-- Follow each language's best practices and conventions
-- Ensure thorough testing in the sandbox environment
-- Update documentation to reflect any changes
+**Step 1 — Create customer**
+```
+Customer record created with donor name, email, and full billing address.
+Returns customerKey.
+```
 
-## 📄 License
+**Step 2 — Store payment method**
+```
+Tokenized card attached to the customer as a RecurringPaymentMethod.
+Returns paymentMethodKey.
+```
 
-MIT License — see [LICENSE](./LICENSE) for details.
+**Step 3 — Create schedule**
+```
+Schedule configured with:
+  - frequency:     monthly / quarterly / annually
+  - duration_type: ongoing / end_date / num_payments
+  - start_date:    provided date, or first day of next month if omitted
+  - currency:      USD
 
-## 🆘 Support
+Returns scheduleKey identifying the active recurring billing agreement.
+```
 
-- **Global Payments Developer Portal**: [https://developer.globalpay.com/](https://developer.globalpay.com/)
-- **Portico API Documentation**: [https://developer.globalpay.com/ecommerce](https://developer.globalpay.com/ecommerce)
-- **Heartland Hosted Fields Guide**: [https://developer.globalpay.com/ecommerce/payments/sdk/heartland-hosted-fields](https://developer.globalpay.com/ecommerce/payments/sdk/heartland-hosted-fields)
-- **Email**: sdksupport@globalpay.com
+## Environment Variables
 
----
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `PUBLIC_API_KEY` | Public key for GlobalPayments Hosted Fields (browser) | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
+| `SECRET_API_KEY` | Secret key for server-side Portico API calls | `skapi_cert_MTyMAQBiHVEA...` |
 
-**Note**: This is a demonstration application for development and testing purposes. For production use, implement additional security measures, error handling, and compliance requirements specific to your use case.
+Obtain credentials from your [Global Payments developer account](https://developer.globalpayments.com/).
+
+## Test Cards
+
+| Brand | Card Number | CVV | Expiry |
+|-------|-------------|-----|--------|
+| Visa | 4012002000060016 | 123 | Any future date |
+| Mastercard | 5473500000000014 | 123 | Any future date |
+| Discover | 6011000990156527 | 123 | Any future date |
+| Amex | 372700699251018 | 1234 | Any future date |
+
+Additional test cards: [developer.globalpayments.com/resources/test-cards](https://developer.globalpayments.com/resources/test-cards)
+
+## Project Structure
+
+```
+portico-donation-form-one-time-recurring-payments/
+├── index.html              # Shared frontend (globalpayments.js + donation form)
+├── docker-compose.yml      # Multi-service Docker config
+├── README.md               # This file
+├── LICENSE
+├── php/                    # PHP implementation (Docker: 8003)
+│   ├── config.php          # GET /config
+│   ├── process-donation.php  # POST /process-donation — router
+│   ├── process-one-time.php  # One-time charge logic
+│   ├── process-recurring.php # Recurring schedule logic
+│   ├── composer.json
+│   ├── .env.sample
+│   └── README.md
+├── nodejs/                 # Node.js implementation (Docker: 8001)
+│   ├── server.js           # Express server with both payment types
+│   ├── package.json
+│   ├── .env.sample
+│   └── README.md
+├── dotnet/                 # .NET implementation (Docker: 8006)
+│   ├── Program.cs          # ASP.NET Core minimal API
+│   ├── dotnet.csproj
+│   ├── .env.sample
+│   └── README.md
+└── java/                   # Java implementation (Docker: 8004)
+    ├── src/
+    ├── pom.xml
+    ├── .env.sample
+    └── README.md
+```
+
+## Troubleshooting
+
+**Hosted Fields not loading / blank card fields**
+The `publicApiKey` returned by `GET /config` is invalid or missing. Open browser DevTools → Network to confirm `/config` returns a 200 with a valid key. Restart the server after editing `.env`.
+
+**"Missing required fields" (400)**
+Check that all required fields for the selected `payment_type` are present. Recurring requires additional fields (`phone`, `street_address`, `city`, `state`, `country`) not needed for one-time. Review the request body against the field tables above.
+
+**"Payment processing failed" — API error**
+Verify `SECRET_API_KEY` in `.env` is correct and starts with `skapi_cert_`. Ensure the cert service URL (`cert.api2.heartlandportico.com`) is reachable from your environment. Check server logs for the raw Portico error message.
+
+**Recurring schedule not created**
+Confirm `frequency` is one of `monthly`, `quarterly`, or `annually` (exact strings). If `duration_type` is `end_date`, an `end_date` in `YYYY-MM-DD` format must be included. If `duration_type` is `num_payments`, `num_payments` must be a positive integer.
+
+**Composer install fails (PHP)**
+Requires PHP 8.0+ and Composer 2.x. Check `php -v` and `composer --version`. Missing `ext-curl` or `ext-json` will cause install failures — install via your OS package manager.
+
+**Maven build fails (Java)**
+Requires Java 17+ and Maven 3.8+. Run `java -version` and `mvn -v`. If dependencies fail to resolve, try `mvn clean package -U` to force a fresh dependency download.
+
+## Per-Language Documentation
+
+- [PHP README](./php/README.md)
+- [Node.js README](./nodejs/README.md)
+- [.NET README](./dotnet/README.md)
+- [Java README](./java/README.md)
+
+## External Resources
+
+- [Global Payments Developer Portal](https://developer.globalpayments.com/)
+- [GlobalPayments Hosted Fields Guide](https://developer.globalpayments.com/api/references-overview)
+- [Portico API Documentation](https://developer.globalpayments.com/api/references-overview)
+- [Test Cards](https://developer.globalpayments.com/resources/test-cards)
+
+## Community
+
+- 🌐 **Developer Portal** — [developer.globalpayments.com](https://developer.globalpayments.com)
+- 💬 **Discord** — [Join the community](https://discord.gg/myER9G9qkc)
+- 📋 **GitHub Discussions** — [github.com/orgs/globalpayments/discussions](https://github.com/orgs/globalpayments/discussions)
+- 📧 **Newsletter** — [Subscribe](https://www.globalpayments.com/en-gb/modals/newsletter)
+- 💼 **LinkedIn** — [Global Payments for Developers](https://www.linkedin.com/showcase/global-payments-for-developers/posts/?feedView=all)
+
+Have a question or found a bug? [Open an issue](https://github.com/globalpayments-samples/portico-donation-form-one-time-recurring-payments/issues) or reach out at [communityexperience@globalpay.com](mailto:communityexperience@globalpay.com).
+
+## License
+
+[MIT](./LICENSE)

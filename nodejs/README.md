@@ -1,170 +1,118 @@
-# Node.js Donation Form — One-Time and Recurring Payments
+# Node.js — Portico Donation Form (One-Time & Recurring)
 
-This example demonstrates a comprehensive donation form supporting both one-time and recurring payments using Express.js and the Global Payments Portico API.
-
-## Features
-
-- **One-Time Donations** - Immediate charge via tokenized card
-- **Recurring Donations** - Customer → RecurringPaymentMethod → Schedule entity chain
-- **Flexible Scheduling** - Monthly, quarterly, and annual billing frequencies
-- **Duration Options** - Ongoing, end date, or specific number of payments
-- **Secure Tokenization** - PCI SAQ-A compliant via Heartland Hosted Fields
+Node.js/Express implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway. Uses GlobalPayments Hosted Fields for PCI SAQ-A compliant tokenization — card data never touches your server.
 
 ## Requirements
 
-- Node.js 14.x or later
+- Node.js 18+
 - npm
-- Global Payments Portico account and API credentials
+- Global Payments Portico account with API credentials
 
 ## Project Structure
 
 ```
 nodejs/
-├── server.js         # Express server with payment processing logic
-├── index.html        # Donation form frontend
-├── package.json      # Dependencies
-├── .env.sample       # Environment variable template
-├── run.sh            # Convenience startup script
-└── Dockerfile        # Container build file
+├── server.js       # Express server — GET /config and POST /process-donation
+├── index.html      # Donation form frontend
+├── package.json    # globalpayments-api + dotenv
+├── .env.sample
+├── Dockerfile
+├── run.sh
+├── .devcontainer/
+└── .codesandbox/
 ```
 
 ## Setup
 
-### 1. Clone and Configure
-
-```bash
-cd nodejs/
-cp .env.sample .env
-```
-
-### 2. Configure Environment Variables
-
-Edit `.env` with your Portico API credentials:
-
-```env
-PUBLIC_API_KEY=pkapi_cert_xxxxxxxxxxxxx
-SECRET_API_KEY=skapi_cert_xxxxxxxxxxxxx
-```
-
-**Test Credentials** (from `.env.sample`):
-```env
-PUBLIC_API_KEY=pkapi_cert_jKc1FtuyAydZhZfbB3
-SECRET_API_KEY=skapi_cert_MTyMAQBiHVEAewvIzXVFcmUd2UcyBge_eCpaASUp0A
-```
-
-### 3. Install Dependencies
-
+**1. Install dependencies**
 ```bash
 npm install
 ```
 
-### 4. Run the Application
+**2. Configure credentials**
+```bash
+cp .env.sample .env
+```
 
+Edit `.env`:
+```env
+PUBLIC_API_KEY=pkapi_cert_jKc1FtuyAydZhZfbB3
+SECRET_API_KEY=skapi_cert_MTyMAQBiHVEAewvIzXVFcmUd2UcyBge_eCpaASUp0A
+PORT=8000
+```
+
+**3. Start the server**
+```bash
+npm start
+# Open http://localhost:8000
+```
+
+Or use the convenience script:
 ```bash
 ./run.sh
 ```
 
-Or manually:
-```bash
-node server.js
+## Environment Variables
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `PUBLIC_API_KEY` | Public key for GlobalPayments Hosted Fields (browser) | ✅ | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
+| `SECRET_API_KEY` | Secret key for server-side Portico API calls | ✅ | `skapi_cert_MTyMAQBiHVEA...` |
+| `PORT` | Server port | ❌ | `8000` (default) |
+
+## SDK Configuration
+
+Configured once at startup in `server.js`:
+
+```javascript
+import {
+    ServicesContainer,
+    PorticoConfig,
+    CreditCardData,
+    Customer,
+    RecurringPaymentMethod,
+    ScheduleFrequency,
+} from 'globalpayments-api';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const config = new PorticoConfig();
+config.secretApiKey = process.env.SECRET_API_KEY.trim();
+config.developerId = '000000';
+config.versionNumber = '0000';
+config.serviceUrl = 'https://cert.api2.heartlandportico.com';
+
+ServicesContainer.configureService(config);
 ```
-
-Then open http://localhost:8000 in your browser.
-
-## Implementation Details
-
-### Server Setup
-
-Express.js web server running on port 8000 (configurable via `PORT` environment variable):
-- `dotenv ^16.3.1` for environment variable loading
-- `globalpayments-api ^3.10.6` for the Portico SDK
-- `express ^4.18.2` for the HTTP server
-- Static files served from the current directory
-- JSON request body parsing enabled
-
-### SDK Configuration
-
-Configured once at startup using `PorticoConfig`:
-- `SECRET_API_KEY` from environment
-- `serviceUrl` pointed at `https://cert.api2.heartlandportico.com`
-- `developerId` and `versionNumber` set for identification
-
-### Payment Routing
-
-`POST /process-donation` reads `payment_type` and dispatches:
-- `"one-time"` → `processOneTime()`
-- `"recurring"` → `processRecurring()`
-
-### One-Time Payment Flow
-
-1. Validates required fields: `payment_reference`, `amount`, `first_name`, `last_name`, `donor_email`, `billing_zip`
-2. Creates `CreditCardData` with Hosted Fields token
-3. Creates `Address` with sanitized postal code
-4. Calls `card.charge(amount).withCurrency('USD').execute()`
-5. Returns transaction ID on success
-
-### Recurring Payment Flow
-
-1. Validates all required fields including full address: `phone`, `street_address`, `city`, `state`, `country`
-2. Creates and saves a `Customer` entity with UUID-based ID
-3. Adds tokenized card as `RecurringPaymentMethod` to the customer
-4. Builds a `Schedule` with frequency and optional duration constraints
-5. Sets `EmailReceipt.Never` on the schedule (required by Heartland PayPlan API)
-6. Returns schedule key, customer key, and payment method key on success
-
-### Utility Functions
-
-- `getEnvVar(name)` — reads an environment variable, trims whitespace from the value
-- `sanitizePostalCode(postalCode)` — strips non-alphanumeric/hyphen characters, truncates to 10 chars
-- `mapFrequency(frequency)` — maps `"monthly"` / `"quarterly"` / `"annually"` to `ScheduleFrequency` SDK enums
-
-### Duration Types
-
-- `"ongoing"` — no end date or payment limit set
-- `"end_date"` — `scheduleBuilder.withEndDate(new Date(body.end_date))`
-- `"num_payments"` — `scheduleBuilder.withNumberOfPayments(parseInt(body.num_payments))`
-
-### Structured Logging
-
-Console output uses prefixed log lines for traceability:
-- `[donation]` — routing decisions
-- `[one-time]` — one-time charge processing
-- `[recurring]` — recurring schedule setup
-- On API errors, `e.responseMessage` is logged to expose the raw Heartland error body
 
 ## API Endpoints
 
 ### GET /config
 
-Returns public API key for Heartland Hosted Fields initialization.
+Returns the public API key for GlobalPayments Hosted Fields initialization.
 
-**Response (success):**
+**Response:**
 ```json
 {
   "success": true,
   "data": {
-    "publicApiKey": "pkapi_cert_xxxxx"
+    "publicApiKey": "pkapi_cert_jKc1FtuyAydZhZfbB3"
   }
 }
 ```
 
-**Response (missing key, HTTP 500):**
-```json
-{
-  "success": false,
-  "message": "Payment configuration is unavailable"
-}
-```
+---
 
 ### POST /process-donation
 
-Routes to appropriate processor based on `payment_type`.
+Routes to one-time or recurring logic based on `payment_type`.
 
 **One-time request:**
 ```json
 {
   "payment_type": "one-time",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "50.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -177,7 +125,7 @@ Routes to appropriate processor based on `payment_type`.
 ```json
 {
   "payment_type": "recurring",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "25.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -189,9 +137,20 @@ Routes to appropriate processor based on `payment_type`.
   "state": "GA",
   "country": "US",
   "frequency": "monthly",
-  "duration_type": "ongoing"
+  "duration_type": "ongoing",
+  "start_date": "2025-05-01"
 }
 ```
+
+**`duration_type` options:**
+
+| Value | Additional Field | Description |
+|-------|-----------------|-------------|
+| `"ongoing"` | — | Runs indefinitely |
+| `"end_date"` | `end_date` (YYYY-MM-DD) | Stops on a specific date |
+| `"num_payments"` | `num_payments` (integer) | Stops after N payments |
+
+**`frequency` options:** `"monthly"`, `"quarterly"`, `"annually"`
 
 **One-time success response:**
 ```json
@@ -200,13 +159,8 @@ Routes to appropriate processor based on `payment_type`.
   "message": "Thank you for your donation!",
   "data": {
     "transactionId": "1234567890",
-    "status": "Approved",
-    "amount": 50,
-    "currency": "USD",
-    "firstName": "Jane",
-    "lastName": "Doe",
-    "donorEmail": "jane@example.com",
-    "timestamp": "2025-04-15 10:30:00"
+    "amount": 50.00,
+    "currency": "USD"
   }
 }
 ```
@@ -220,14 +174,10 @@ Routes to appropriate processor based on `payment_type`.
     "scheduleKey": "schedule_xxxxx",
     "customerKey": "customer_xxxxx",
     "paymentMethodKey": "pm_xxxxx",
-    "amount": 25,
+    "amount": 25.00,
     "currency": "USD",
     "frequency": "monthly",
-    "startDate": "2025-05-01",
-    "firstName": "Jane",
-    "lastName": "Doe",
-    "donorEmail": "jane@example.com",
-    "timestamp": "2025-04-15 10:30:00"
+    "startDate": "2025-05-01"
   }
 }
 ```
@@ -244,40 +194,98 @@ Routes to appropriate processor based on `payment_type`.
 }
 ```
 
-Error codes: `PAYMENT_DECLINED`, `API_ERROR`, `SYSTEM_ERROR`
+## One-Time Payment Flow
 
-## Security Considerations
+```javascript
+const card = new CreditCardData();
+card.token = paymentReference;
+card.cardHolderName = `${firstName} ${lastName}`;
 
-### PCI Compliance
+const address = new Address();
+address.postalCode = sanitizePostalCode(billingZip);
 
-- ✅ **PCI SAQ-A Compliant** — Card data never touches your server
-- ✅ **Tokenization** — Heartland Hosted Fields handle all sensitive card data
-- ✅ **HTTPS Required** — Always use HTTPS in production
+const response = await card.charge(parseFloat(amount))
+    .withCurrency('USD')
+    .withAddress(address)
+    .execute();
 
-### Input Validation
+return { transactionId: response.transactionId };
+```
 
-- ✅ Server-side validation of all required fields
-- ✅ Postal code sanitization (alphanumeric + hyphen only, max 10 chars)
-- ✅ Amount validation (must be > 0)
-- ✅ Payment type validation before routing
+## Recurring Payment Flow
 
-### Production Checklist
+```javascript
+// Step 1 — Create customer
+const customer = new Customer();
+customer.id = generateUuid();
+customer.firstName = firstName;
+customer.email = donorEmail;
+customer.address = new Address();
+customer.address.streetAddress1 = streetAddress;
+// ... other fields ...
+const savedCustomer = await customer.create();
 
-- [ ] Replace test credentials with production API keys
-- [ ] Enable HTTPS/SSL on your server
-- [ ] Implement rate limiting on payment endpoints
-- [ ] Add CSRF protection to forms
-- [ ] Configure proper error logging
-- [ ] Set up monitoring and alerts
+// Step 2 — Store payment method
+const savedMethod = await savedCustomer
+    .addPaymentMethod(generateUuid(), card)
+    .create();
 
-## Additional Resources
+// Step 3 — Create schedule
+const schedule = savedMethod.addSchedule(generateUuid())
+    .withStatus('Active')
+    .withAmount(parseFloat(amount))
+    .withCurrency('USD')
+    .withFrequency(mapFrequency(frequency))  // ScheduleFrequency.Monthly etc.
+    .withStartDate(new Date(startDate));
 
-- [Global Payments Developer Portal](https://developer.globalpay.com/)
-- [Portico API Documentation](https://developer.globalpay.com/ecommerce)
-- [Node.js SDK on npm](https://www.npmjs.com/package/globalpayments-api)
-- [Heartland Hosted Fields Guide](https://developer.globalpay.com/ecommerce/payments/sdk/heartland-hosted-fields)
+// Apply duration constraint
+if (durationType === 'end_date') schedule.withEndDate(new Date(endDate));
+if (durationType === 'num_payments') schedule.withNumberOfPayments(parseInt(numPayments));
 
-## Support
+const savedSchedule = await schedule.create();
+```
 
-- Email: sdksupport@globalpay.com
-- Developer Portal: https://developer.globalpay.com/
+## Test Cards
+
+| Brand | Card Number | CVV | Expiry |
+|-------|-------------|-----|--------|
+| Visa | 4012002000060016 | 123 | Any future date |
+| Mastercard | 5473500000000014 | 123 | Any future date |
+| Discover | 6011000990156527 | 123 | Any future date |
+| Amex | 372700699251018 | 1234 | Any future date |
+
+## Docker
+
+```bash
+docker build -t portico-donation-nodejs .
+docker run -p 8001:8000 \
+  -e PUBLIC_API_KEY=your_key \
+  -e SECRET_API_KEY=your_key \
+  portico-donation-nodejs
+# Open http://localhost:8001
+```
+
+Or via docker-compose from the project root:
+```bash
+docker-compose up nodejs
+```
+
+## Troubleshooting
+
+**Hosted Fields not loading**
+Verify `GET /config` returns a 200 with a valid `publicApiKey`. Check the browser console for globalpayments.js initialization errors. Ensure `PUBLIC_API_KEY` is set in `.env` and the server was restarted after editing it.
+
+**"Missing required fields" (400)**
+Recurring requires additional fields beyond one-time: `phone`, `street_address`, `city`, `state`, `country`. Confirm all fields are included in the request body and are non-empty strings.
+
+**"Payment processing failed" — Portico error**
+Confirm `SECRET_API_KEY` in `.env` starts with `skapi_cert_`. Trim any trailing whitespace — the `getEnvVar()` helper in `server.js` handles this automatically. Check the server console for the full Portico error message.
+
+**`import` syntax error on startup**
+The project uses ES module syntax. Ensure `"type": "module"` is present in `package.json` and you're running Node.js 18+. Check with `node --version`.
+
+**Frequency value not recognized**
+`frequency` must be exactly `"monthly"`, `"quarterly"`, or `"annually"`. The `mapFrequency()` function maps these to SDK constants. Any other value will be unmapped and cause the schedule creation to fail.
+
+**Schedule created but no immediate charge**
+Recurring schedule creation does not immediately charge the donor. The first charge occurs on `start_date`. If omitted, the default is the first day of the following month.

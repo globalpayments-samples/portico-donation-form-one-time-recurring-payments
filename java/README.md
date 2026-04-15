@@ -1,20 +1,12 @@
-# Java Donation Form — One-Time and Recurring Payments
+# Java — Portico Donation Form (One-Time & Recurring)
 
-This example demonstrates a comprehensive donation form supporting both one-time and recurring payments using Jakarta EE servlets and the Global Payments Portico API.
-
-## Features
-
-- **One-Time Donations** - Immediate charge via tokenized card
-- **Recurring Donations** - Customer → RecurringPaymentMethod → Schedule entity chain
-- **Flexible Scheduling** - Monthly, quarterly, and annual billing frequencies
-- **Duration Options** - Ongoing, end date, or specific number of payments
-- **Secure Tokenization** - PCI SAQ-A compliant via Heartland Hosted Fields
+Jakarta EE/Servlet implementation of a donation form supporting both one-time and recurring payments using the Global Payments Portico gateway. Uses GlobalPayments Hosted Fields for PCI SAQ-A compliant tokenization — card data never touches your server.
 
 ## Requirements
 
-- Java 23
-- Maven
-- Global Payments Portico account and API credentials
+- Java 17+
+- Maven 3.8+
+- Global Payments Portico account with API credentials
 
 ## Project Structure
 
@@ -23,142 +15,98 @@ java/
 ├── src/
 │   └── main/
 │       ├── java/com/globalpayments/example/
-│       │   └── ProcessPaymentServlet.java  # Main servlet (handles /config and /process-donation)
+│       │   └── ProcessPaymentServlet.java  # Handles /config and /process-donation
 │       └── webapp/
 │           ├── index.html                  # Donation form frontend
-│           └── WEB-INF/
-│               └── web.xml                 # Web application configuration
-├── pom.xml           # Maven dependencies and build config
-├── .env.sample       # Environment variable template
-├── run.sh            # Convenience startup script
-└── Dockerfile        # Container build file
+│           └── WEB-INF/web.xml             # Servlet configuration
+├── pom.xml         # com.globalpayments:java-sdk dependency
+├── .env.sample
+├── Dockerfile
+├── run.sh
+├── .devcontainer/
+└── .codesandbox/
 ```
 
 ## Setup
 
-### 1. Clone and Configure
-
+**1. Build the project**
 ```bash
-cd java/
+mvn clean package
+```
+
+**2. Configure credentials**
+```bash
 cp .env.sample .env
 ```
 
-### 2. Configure Environment Variables
-
-Edit `.env` with your Portico API credentials:
-
-```env
-PUBLIC_API_KEY=pkapi_cert_xxxxxxxxxxxxx
-SECRET_API_KEY=skapi_cert_xxxxxxxxxxxxx
-```
-
-**Test Credentials** (from `.env.sample`):
+Edit `.env`:
 ```env
 PUBLIC_API_KEY=pkapi_cert_jKc1FtuyAydZhZfbB3
 SECRET_API_KEY=skapi_cert_MTyMAQBiHVEAewvIzXVFcmUd2UcyBge_eCpaASUp0A
 ```
 
-### 3. Build the Project
-
+**3. Start the server**
 ```bash
-mvn clean install
+mvn cargo:run
+# Open http://localhost:8080
 ```
 
-### 4. Run the Application
-
+Or use the convenience script:
 ```bash
 ./run.sh
 ```
 
-Or manually:
-```bash
-mvn cargo:run
+## Environment Variables
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `PUBLIC_API_KEY` | Public key for GlobalPayments Hosted Fields (browser) | ✅ | `pkapi_cert_jKc1FtuyAydZhZfbB3` |
+| `SECRET_API_KEY` | Secret key for server-side Portico API calls | ✅ | `skapi_cert_MTyMAQBiHVEA...` |
+
+## SDK Configuration
+
+Configured at servlet initialization:
+
+```java
+import com.global.api.ServicesContainer;
+import com.global.api.serviceConfigs.PorticoConfig;
+
+PorticoConfig config = new PorticoConfig();
+config.setSecretApiKey(System.getenv("SECRET_API_KEY"));
+config.setDeveloperId("000000");
+config.setVersionNumber("0000");
+config.setServiceUrl("https://cert.api2.heartlandportico.com");
+
+ServicesContainer.configureService(config);
 ```
-
-Then open http://localhost:8000 in your browser.
-
-## Implementation Details
-
-### Architecture
-
-Jakarta EE servlet packaged as a WAR, deployed to an embedded Tomcat 10.x via the Cargo Maven plugin:
-- Port 8000, context path `/`
-- `dotenv-java 3.0.0` for environment variable loading
-- `globalpayments-sdk 14.2.20` for the Portico SDK
-- Gson for JSON serialization/deserialization
-
-### Servlet Configuration
-
-`ProcessPaymentServlet` is mapped to both `/config` and `/process-donation` via `@WebServlet`. The `init()` method configures the Portico SDK:
-- `SECRET_API_KEY` from the dotenv file
-- `serviceUrl` pointed at `https://cert.api2.heartlandportico.com`
-- `developerId` and `versionNumber` set for identification
-
-### Request Routing
-
-- `doGet()` — handles `GET /config`, returns public API key
-- `doPost()` — handles `POST /process-donation`, reads `payment_type` and routes to `processOneTime()` or `processRecurring()`
-
-### One-Time Payment Flow
-
-1. Validates required fields: `payment_reference`, `amount`, `first_name`, `last_name`, `donor_email`, `billing_zip`
-2. Creates `CreditCardData` with Hosted Fields token and cardholder name
-3. Creates `Address` with sanitized postal code
-4. Calls `card.charge(amount).withCurrency("USD").execute()`
-5. Returns transaction ID on success
-
-### Recurring Payment Flow
-
-1. Validates all required fields including full address: `phone`, `street_address`, `city`, `state`, `country`
-2. Creates and saves a `Customer` entity with UUID-based ID
-3. Adds tokenized card as a `RecurringPaymentMethod` to the customer
-4. Builds a `Schedule` with frequency and optional duration constraints
-5. Default start date: first day of next month if `start_date` not provided
-6. Returns schedule key, customer key, and payment method key on success
-
-### Utility Methods
-
-- `sanitizePostalCode(String)` — strips non-alphanumeric/hyphen characters, truncates to 10 chars
-- `mapFrequency(String)` — maps `"monthly"` / `"quarterly"` / `"annually"` to `ScheduleFrequency` SDK enums
-
-### Duration Types
-
-- `"ongoing"` — no end date or payment limit set
-- `"end_date"` — `scheduleBuilder.withEndDate(parsedDate)`
-- `"num_payments"` — `scheduleBuilder.withNumberOfPayments(n)`
-
-### Structured Logging
-
-Console output uses prefixed log lines for traceability:
-- `[donation]` — routing decisions
-- `[one-time]` — one-time charge processing
-- `[recurring]` — recurring schedule setup
 
 ## API Endpoints
 
 ### GET /config
 
-Returns public API key for Heartland Hosted Fields initialization.
+Returns the public API key for GlobalPayments Hosted Fields initialization.
 
 **Response:**
 ```json
 {
   "success": true,
   "data": {
-    "publicApiKey": "pkapi_cert_xxxxx"
+    "publicApiKey": "pkapi_cert_jKc1FtuyAydZhZfbB3"
   }
 }
 ```
 
+---
+
 ### POST /process-donation
 
-Routes to appropriate processor based on `payment_type`.
+Routes to one-time or recurring logic based on `payment_type`.
 
 **One-time request:**
 ```json
 {
   "payment_type": "one-time",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "50.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -171,7 +119,7 @@ Routes to appropriate processor based on `payment_type`.
 ```json
 {
   "payment_type": "recurring",
-  "payment_reference": "<hosted-fields-token>",
+  "payment_reference": "supt_xxxxxxxxxxxxxx",
   "amount": "25.00",
   "first_name": "Jane",
   "last_name": "Doe",
@@ -183,9 +131,20 @@ Routes to appropriate processor based on `payment_type`.
   "state": "GA",
   "country": "US",
   "frequency": "monthly",
-  "duration_type": "ongoing"
+  "duration_type": "ongoing",
+  "start_date": "2025-05-01"
 }
 ```
+
+**`duration_type` options:**
+
+| Value | Additional Field | Description |
+|-------|-----------------|-------------|
+| `"ongoing"` | — | Runs indefinitely |
+| `"end_date"` | `end_date` (YYYY-MM-DD) | Stops on a specific date |
+| `"num_payments"` | `num_payments` (integer) | Stops after N payments |
+
+**`frequency` options:** `"monthly"`, `"quarterly"`, `"annually"`
 
 **One-time success response:**
 ```json
@@ -194,13 +153,8 @@ Routes to appropriate processor based on `payment_type`.
   "message": "Thank you for your donation!",
   "data": {
     "transactionId": "1234567890",
-    "status": "Approved",
     "amount": 50.00,
-    "currency": "USD",
-    "firstName": "Jane",
-    "lastName": "Doe",
-    "donorEmail": "jane@example.com",
-    "timestamp": "2025-04-15 10:30:00"
+    "currency": "USD"
   }
 }
 ```
@@ -217,11 +171,7 @@ Routes to appropriate processor based on `payment_type`.
     "amount": 25.00,
     "currency": "USD",
     "frequency": "monthly",
-    "startDate": "2025-05-01",
-    "firstName": "Jane",
-    "lastName": "Doe",
-    "donorEmail": "jane@example.com",
-    "timestamp": "2025-04-15 10:30:00"
+    "startDate": "2025-05-01"
   }
 }
 ```
@@ -238,40 +188,104 @@ Routes to appropriate processor based on `payment_type`.
 }
 ```
 
-Error codes: `PAYMENT_DECLINED`, `API_ERROR`, `SYSTEM_ERROR`
+## One-Time Payment Flow
 
-## Security Considerations
+```java
+CreditCardData card = new CreditCardData();
+card.setToken(paymentReference);
+card.setCardHolderName(firstName + " " + lastName);
 
-### PCI Compliance
+Address address = new Address();
+address.setPostalCode(sanitizePostalCode(billingZip));
 
-- ✅ **PCI SAQ-A Compliant** — Card data never touches your server
-- ✅ **Tokenization** — Heartland Hosted Fields handle all sensitive card data
-- ✅ **HTTPS Required** — Always use HTTPS in production
+Transaction response = card.charge(new BigDecimal(amount))
+    .withCurrency("USD")
+    .withAddress(address)
+    .execute();
 
-### Input Validation
+String transactionId = response.getTransactionId();
+```
 
-- ✅ Server-side validation of all required fields
-- ✅ Postal code sanitization (alphanumeric + hyphen only, max 10 chars)
-- ✅ Amount validation (must be > 0)
-- ✅ Payment type validation before routing
+## Recurring Payment Flow
 
-### Production Checklist
+```java
+// Step 1 — Create customer
+Customer customer = new Customer();
+customer.setId(UUID.randomUUID().toString());
+customer.setFirstName(firstName);
+customer.setEmail(donorEmail);
+Address address = new Address();
+address.setStreetAddress1(streetAddress);
+// ... other fields ...
+customer.setAddress(address);
+Customer savedCustomer = customer.create();
 
-- [ ] Replace test credentials with production API keys
-- [ ] Enable HTTPS/SSL on your server
-- [ ] Implement rate limiting on payment endpoints
-- [ ] Add CSRF protection to forms
-- [ ] Configure proper error logging
-- [ ] Set up monitoring and alerts
+// Step 2 — Store payment method
+RecurringPaymentMethod savedMethod = savedCustomer
+    .addPaymentMethod(UUID.randomUUID().toString(), card)
+    .create();
 
-## Additional Resources
+// Step 3 — Create schedule
+Schedule schedule = savedMethod.addSchedule(UUID.randomUUID().toString())
+    .withStatus("Active")
+    .withAmount(new BigDecimal(amount))
+    .withCurrency("USD")
+    .withFrequency(mapFrequency(frequency))
+    .withStartDate(parseDate(startDate));
 
-- [Global Payments Developer Portal](https://developer.globalpay.com/)
-- [Portico API Documentation](https://developer.globalpay.com/ecommerce)
-- [Java SDK on GitHub](https://github.com/globalpayments/java-sdk)
-- [Heartland Hosted Fields Guide](https://developer.globalpay.com/ecommerce/payments/sdk/heartland-hosted-fields)
+// Apply duration constraint
+if ("end_date".equals(durationType))    schedule.withEndDate(parseDate(endDate));
+if ("num_payments".equals(durationType)) schedule.withNumberOfPayments(Integer.parseInt(numPayments));
 
-## Support
+Schedule savedSchedule = schedule.create();
+```
 
-- Email: sdksupport@globalpay.com
-- Developer Portal: https://developer.globalpay.com/
+## Test Cards
+
+| Brand | Card Number | CVV | Expiry |
+|-------|-------------|-----|--------|
+| Visa | 4012002000060016 | 123 | Any future date |
+| Mastercard | 5473500000000014 | 123 | Any future date |
+| Discover | 6011000990156527 | 123 | Any future date |
+| Amex | 372700699251018 | 1234 | Any future date |
+
+## Docker
+
+```bash
+docker build -t portico-donation-java .
+docker run -p 8004:8000 \
+  -e PUBLIC_API_KEY=your_key \
+  -e SECRET_API_KEY=your_key \
+  portico-donation-java
+# Open http://localhost:8004
+```
+
+Or via docker-compose from the project root:
+```bash
+docker-compose up java
+```
+
+## Troubleshooting
+
+**Hosted Fields not loading**
+Verify `GET /config` returns a 200 with a valid `publicApiKey`. If the servlet throws at startup, check that `PUBLIC_API_KEY` and `SECRET_API_KEY` are set as environment variables before running.
+
+**"Missing required fields" (400)**
+Recurring requires additional fields beyond one-time: `phone`, `street_address`, `city`, `state`, `country`. Confirm all required fields are present in the JSON body.
+
+**"Payment processing failed" — Portico error**
+Confirm `SECRET_API_KEY` starts with `skapi_cert_`. Environment variables must be exported in the shell before running `mvn cargo:run`:
+```bash
+export SECRET_API_KEY=skapi_cert_...
+export PUBLIC_API_KEY=pkapi_cert_...
+mvn cargo:run
+```
+
+**Maven build fails**
+Requires Java 17+ and Maven 3.8+. Confirm with `java -version` and `mvn -v`. If the `com.globalpayments:java-sdk` dependency fails to resolve, run `mvn clean package -U` to force a refresh.
+
+**Port conflict on 8080**
+The Java implementation defaults to port 8080 (Tomcat default), not 8000 like the other languages. If 8080 is occupied, update the `cargo` plugin port in `pom.xml` or stop the conflicting process with `lsof -i :8080`.
+
+**Schedule created but no immediate charge**
+Recurring schedule creation does not charge the donor immediately. The first charge occurs on `start_date`. If omitted, the default is the first day of the following month.
