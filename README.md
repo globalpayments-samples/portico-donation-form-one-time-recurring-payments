@@ -349,6 +349,14 @@ Requires Java 17+ and Maven 3.8+. Run `java -version` and `mvn -v`. If dependenc
 - [.NET README](./dotnet/README.md)
 - [Java README](./java/README.md)
 
+## Security Considerations
+
+- Store credentials in `.env` files, never commit to source control
+- API keys never exposed to the frontend
+- All payment processing happens server-side
+- Use HTTPS in production
+- Recurring donations use stored credentials per card network rules
+
 ## External Resources
 
 - [Global Payments Developer Portal](https://developer.globalpayments.com/)
