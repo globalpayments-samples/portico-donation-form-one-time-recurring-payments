@@ -58,7 +58,7 @@ Browser                        Backend                         Portico API
 
 - Global Payments Portico developer account
 - Portico API credentials (`PUBLIC_API_KEY` and `SECRET_API_KEY`)
-- Docker, or runtime for your chosen language (PHP 8.0+, Node.js 18+, .NET 9+, Java 17+)
+- Docker, or runtime for your chosen language (PHP 8.2.35+/8.3.36+/8.4.27+/8.5.12+, Node.js 18+, .NET 9+, Java 17+)
 
 ## Quick Start
 
@@ -337,7 +337,7 @@ Verify `SECRET_API_KEY` in `.env` is correct and starts with `skapi_cert_`. Ensu
 Confirm `frequency` is one of `monthly`, `quarterly`, or `annually` (exact strings). If `duration_type` is `end_date`, an `end_date` in `YYYY-MM-DD` format must be included. If `duration_type` is `num_payments`, `num_payments` must be a positive integer.
 
 **Composer install fails (PHP)**
-Requires PHP 8.0+ and Composer 2.x. Check `php -v` and `composer --version`. Missing `ext-curl` or `ext-json` will cause install failures — install via your OS package manager.
+Requires PHP 8.2.35+, 8.3.36+, 8.4.27+, or 8.5.12+ and Composer 2.x. Check `php -v` and `composer --version`. Missing `ext-curl` or `ext-json` will cause install failures — install via your OS package manager.
 
 **Maven build fails (Java)**
 Requires Java 17+ and Maven 3.8+. Run `java -version` and `mvn -v`. If dependencies fail to resolve, try `mvn clean package -U` to force a fresh dependency download.
