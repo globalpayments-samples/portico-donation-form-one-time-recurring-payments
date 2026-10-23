@@ -4,7 +4,7 @@ PHP implementation of a donation form supporting both one-time and recurring pay
 
 ## Requirements
 
-- PHP 8.0+
+- PHP 8.2.35+, 8.3.36+, 8.4.27+, or 8.5.12+ for the web server
 - Composer
 - Global Payments Portico account with API credentials
 
@@ -45,7 +45,7 @@ SECRET_API_KEY=skapi_cert_MTyMAQBiHVEAewvIzXVFcmUd2UcyBge_eCpaASUp0A
 
 **3. Start the server**
 ```bash
-php -S localhost:8000
+./run.sh
 # Open http://localhost:8000
 ```
 
@@ -269,7 +269,7 @@ docker-compose up php
 ## Troubleshooting
 
 **Hosted Fields not loading**
-Verify `GET /config.php` returns a 200 with a valid `publicApiKey`. If it returns an error, check that `.env` exists and `composer install` completed. Restart `php -S` after editing `.env`.
+Verify `GET /config.php` returns a 200 with a valid `publicApiKey`. If it returns an error, check that `.env` exists and `composer install` completed. Restart `./run.sh` after editing `.env`.
 
 **"Missing required fields" (400)**
 Recurring requires `phone`, `street_address`, `city`, `state`, and `country` in addition to the one-time fields. Verify all required fields are in the JSON body before posting.
@@ -281,7 +281,7 @@ Confirm `SECRET_API_KEY` starts with `skapi_cert_` for the certification environ
 `frequency` must be exactly `"monthly"`, `"quarterly"`, or `"annually"`. Any other string will not map to a valid `ScheduleFrequency` constant and will cause the request to fail before reaching Portico.
 
 **Composer install fails**
-Requires PHP 8.0+ and Composer 2.x. Confirm with `php -v` and `composer --version`. If `ext-curl` or `ext-json` are missing, install them via your OS package manager (e.g. `apt install php-curl php-json`).
+Requires a patched PHP release (8.2.35+, 8.3.36+, 8.4.27+, or 8.5.12+) and Composer 2.x. Confirm with `php -v` and `composer --version`. If `ext-curl` or `ext-json` are missing, install them via your OS package manager (e.g. `apt install php-curl php-json`).
 
 **Schedule created but no charge taken**
 A schedule creation only records the recurring agreement — it does not immediately charge the donor. The first charge occurs on `start_date`. If `start_date` was omitted, the default is the first day of the following month.
