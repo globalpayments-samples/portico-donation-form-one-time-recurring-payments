@@ -1,5 +1,6 @@
 import express from 'express';
 import * as dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import {
     ServicesContainer,
@@ -20,7 +21,11 @@ const getEnvVar = (name) => (process.env[name] ?? '').trim();
 const app = express();
 const port = process.env.PORT || 8000;
 
-app.use(express.static('.'));
+// Serve only the frontend page, never the server's own files
+const indexPath = fileURLToPath(new URL('./index.html', import.meta.url));
+app.get(['/', '/index.html'], (req, res) => {
+    res.sendFile(indexPath);
+});
 app.use(express.json());
 
 const config = new PorticoConfig();
