@@ -4,7 +4,7 @@ ASP.NET Core implementation of a donation form supporting both one-time and recu
 
 ## Requirements
 
-- .NET 9.0+
+- .NET 10.0+
 - Global Payments Portico account with API credentials
 
 ## Project Structure
@@ -281,7 +281,7 @@ Recurring requires additional fields beyond one-time: `phone`, `street_address`,
 Confirm `SECRET_API_KEY` starts with `skapi_cert_`. The `GetEnvVar()` helper strips inline comments (e.g. `#gitleaks:allow`) automatically. Check the server console for the raw Portico exception message.
 
 **`dotnet run` fails with package error**
-Verify .NET 9+ is installed: `dotnet --version`. Run `dotnet restore` to pull fresh packages. If `GlobalPayments.Api` restore fails, clear the NuGet cache: `dotnet nuget locals all --clear`.
+Verify .NET 10+ is installed: `dotnet --version`. Run `dotnet restore` to pull fresh packages. If `GlobalPayments.Api` restore fails, clear the NuGet cache: `dotnet nuget locals all --clear`.
 
 **Static files not served (index.html 404)**
 The frontend is served from `wwwroot/`. Ensure `app.UseStaticFiles()` and `app.UseDefaultFiles()` are both present in `Program.cs` and that `wwwroot/index.html` exists.

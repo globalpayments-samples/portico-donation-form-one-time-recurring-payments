@@ -58,7 +58,7 @@ Browser                        Backend                         Portico API
 
 - Global Payments Portico developer account
 - Portico API credentials (`PUBLIC_API_KEY` and `SECRET_API_KEY`)
-- Docker, or runtime for your chosen language (PHP 8.2.35+/8.3.36+/8.4.27+/8.5.12+, Node.js 18+, .NET 9+, Java 17+)
+- Docker, or runtime for your chosen language (PHP 8.2.35+/8.3.36+/8.4.27+/8.5.12+, Node.js 18+, .NET 10+, Java 17+)
 
 ## Quick Start
 
