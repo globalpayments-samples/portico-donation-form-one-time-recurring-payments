@@ -4,7 +4,7 @@ Jakarta EE/Servlet implementation of a donation form supporting both one-time an
 
 ## Requirements
 
-- Java 17+
+- Java 21+
 - Maven 3.8+
 - Global Payments Portico account with API credentials
 
@@ -282,7 +282,7 @@ mvn cargo:run
 ```
 
 **Maven build fails**
-Requires Java 17+ and Maven 3.8+. Confirm with `java -version` and `mvn -v`. If the `com.globalpayments:java-sdk` dependency fails to resolve, run `mvn clean package -U` to force a refresh.
+Requires Java 21+ and Maven 3.8+. Confirm with `java -version` and `mvn -v`. If the `com.globalpayments:java-sdk` dependency fails to resolve, run `mvn clean package -U` to force a refresh.
 
 **Port conflict on 8080**
 The Java implementation defaults to port 8080 (Tomcat default), not 8000 like the other languages. If 8080 is occupied, update the `cargo` plugin port in `pom.xml` or stop the conflicting process with `lsof -i :8080`.
