@@ -4,7 +4,7 @@ Node.js/Express implementation of a donation form supporting both one-time and r
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 24+
 - npm
 - Global Payments Portico account with API credentials
 
@@ -282,7 +282,7 @@ Recurring requires additional fields beyond one-time: `phone`, `street_address`,
 Confirm `SECRET_API_KEY` in `.env` starts with `skapi_cert_`. Trim any trailing whitespace — the `getEnvVar()` helper in `server.js` handles this automatically. Check the server console for the full Portico error message.
 
 **`import` syntax error on startup**
-The project uses ES module syntax. Ensure `"type": "module"` is present in `package.json` and you're running Node.js 18+. Check with `node --version`.
+The project uses ES module syntax. Ensure `"type": "module"` is present in `package.json` and you're running Node.js 24+. Check with `node --version`.
 
 **Frequency value not recognized**
 `frequency` must be exactly `"monthly"`, `"quarterly"`, or `"annually"`. The `mapFrequency()` function maps these to SDK constants. Any other value will be unmapped and cause the schedule creation to fail.
