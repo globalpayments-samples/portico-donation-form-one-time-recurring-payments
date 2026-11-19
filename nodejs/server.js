@@ -57,7 +57,7 @@ app.get('/config', (req, res) => {
             message: 'Payment configuration is unavailable',
         });
     }
-    console.log(`[config] Serving publicApiKey: ${publicApiKey.slice(0, 12)}***`);
+    console.log('[config] Serving the public API key');
     res.json({
         success: true,
         data: { publicApiKey },
