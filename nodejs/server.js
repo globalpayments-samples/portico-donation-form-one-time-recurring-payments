@@ -1,5 +1,7 @@
 import express from 'express';
 import * as dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import {
     ServicesContainer,
@@ -20,7 +22,12 @@ const getEnvVar = (name) => (process.env[name] ?? '').trim();
 const app = express();
 const port = process.env.PORT || 8000;
 
-app.use(express.static('.'));
+// Serve only the frontend page, never the server's own files
+const indexPath = fileURLToPath(new URL('./index.html', import.meta.url));
+const indexHtml = readFileSync(indexPath, 'utf8');
+app.get(['/', '/index.html'], (req, res) => {
+    res.type('html').send(indexHtml);
+});
 app.use(express.json());
 
 const config = new PorticoConfig();
@@ -52,7 +59,7 @@ app.get('/config', (req, res) => {
             message: 'Payment configuration is unavailable',
         });
     }
-    console.log(`[config] Serving publicApiKey: ${publicApiKey.slice(0, 12)}***`);
+    console.log('[config] Serving the public API key');
     res.json({
         success: true,
         data: { publicApiKey },
