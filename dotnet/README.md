@@ -44,7 +44,7 @@ SECRET_API_KEY=skapi_cert_MTyMAQBiHVEAewvIzXVFcmUd2UcyBge_eCpaASUp0A
 **3. Start the server**
 ```bash
 dotnet run
-# Open http://localhost:5000
+# Open http://localhost:8000
 ```
 
 Or use the convenience script:
