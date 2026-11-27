@@ -30,6 +30,15 @@ app.get(['/', '/index.html'], (req, res) => {
 });
 app.use(express.json());
 
+// Treat a body that is not valid JSON as empty so it gets the normal JSON error, not an HTML page
+app.use((err, req, res, next) => {
+    if (err.type === 'entity.parse.failed') {
+        req.body = {};
+        return next();
+    }
+    next(err);
+});
+
 const config = new PorticoConfig();
 config.secretApiKey = getEnvVar('SECRET_API_KEY');
 config.developerId = '000000';
@@ -98,12 +107,12 @@ app.post('/process-donation', async (req, res) => {
 
 async function processOneTime(body, res) {
     try {
-        if (!body.payment_reference) throw new Error('Missing payment reference');
-        if (!body.amount || parseFloat(body.amount) <= 0) throw new Error('Invalid amount');
-        if (!body.first_name) throw new Error('Missing first name');
-        if (!body.last_name) throw new Error('Missing last name');
-        if (!body.donor_email) throw new Error('Missing donor email');
-        if (!body.billing_zip) throw new Error('Missing billing zip');
+        if (!body.payment_reference) throw new ApiError('Missing payment reference');
+        if (!(parseFloat(body.amount) > 0)) throw new ApiError('Invalid amount');
+        if (!body.first_name) throw new ApiError('Missing first name');
+        if (!body.last_name) throw new ApiError('Missing last name');
+        if (!body.donor_email) throw new ApiError('Missing donor email');
+        if (!body.billing_zip) throw new ApiError('Missing billing zip');
 
         const amount = parseFloat(body.amount);
         const firstName = body.first_name.trim();
@@ -169,7 +178,7 @@ async function processOneTime(body, res) {
 
 async function processRecurring(body, res) {
     try {
-        if (!body.amount || parseFloat(body.amount) <= 0) throw new Error('Invalid amount');
+        if (!(parseFloat(body.amount) > 0)) throw new ApiError('Invalid amount');
 
         const requiredFields = [
             'payment_reference', 'first_name', 'last_name',
@@ -177,7 +186,7 @@ async function processRecurring(body, res) {
             'phone', 'street_address', 'city', 'state', 'country',
         ];
         for (const field of requiredFields) {
-            if (!body[field]) throw new Error(`Missing required field: ${field}`);
+            if (!body[field]) throw new ApiError(`Missing required field: ${field}`);
         }
 
         const amount = parseFloat(body.amount);
