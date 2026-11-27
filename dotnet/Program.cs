@@ -71,7 +71,22 @@ public class Program
 
         app.MapPost("/process-donation", async (HttpContext context) =>
         {
-            using var doc = await JsonDocument.ParseAsync(context.Request.Body);
+            JsonDocument doc;
+            try
+            {
+                doc = await JsonDocument.ParseAsync(context.Request.Body);
+            }
+            catch (JsonException)
+            {
+                // Empty or invalid body: treat it as an empty object so it gets the normal JSON error
+                doc = JsonDocument.Parse("{}");
+            }
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                doc.Dispose();
+                doc = JsonDocument.Parse("{}");
+            }
+            using var _ = doc;
             var root = doc.RootElement;
 
             string GetStr(string key)
