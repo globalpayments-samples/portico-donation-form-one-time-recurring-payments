@@ -123,7 +123,12 @@ public class ProcessPaymentServlet extends HttpServlet {
                 throw new ApiException("Missing payment reference");
             if (amountStr == null || amountStr.isEmpty())
                 throw new ApiException("Invalid amount");
-            BigDecimal amount = new BigDecimal(amountStr);
+            BigDecimal amount;
+            try {
+                amount = new BigDecimal(amountStr);
+            } catch (NumberFormatException e) {
+                throw new ApiException("Invalid amount");
+            }
             if (amount.compareTo(BigDecimal.ZERO) <= 0)
                 throw new ApiException("Invalid amount");
             if (firstName == null || firstName.isEmpty())
@@ -203,7 +208,12 @@ public class ProcessPaymentServlet extends HttpServlet {
             String amountStr = getStr(body, "amount");
             if (amountStr == null || amountStr.isEmpty())
                 throw new ApiException("Invalid amount");
-            BigDecimal amount = new BigDecimal(amountStr);
+            BigDecimal amount;
+            try {
+                amount = new BigDecimal(amountStr);
+            } catch (NumberFormatException e) {
+                throw new ApiException("Invalid amount");
+            }
             if (amount.compareTo(BigDecimal.ZERO) <= 0)
                 throw new ApiException("Invalid amount");
 
