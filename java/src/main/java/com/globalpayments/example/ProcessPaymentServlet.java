@@ -78,7 +78,13 @@ public class ProcessPaymentServlet extends HttpServlet {
             }
         }
 
-        JsonObject body = JsonParser.parseString(sb.toString()).getAsJsonObject();
+        JsonObject body;
+        try {
+            body = JsonParser.parseString(sb.toString()).getAsJsonObject();
+        } catch (RuntimeException e) {
+            // Empty body, invalid JSON or a JSON value that is not an object
+            body = new JsonObject();
+        }
         String paymentType = getStr(body, "payment_type");
 
         if (paymentType == null || paymentType.isEmpty()) {
