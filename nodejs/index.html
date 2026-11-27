@@ -248,7 +248,7 @@
             })
             .then(data => {
                 if (data.success) {
-                    showMessage(buildSuccessHtml(paymentType, data.data), 'success');
+                    showMessage(buildSuccessHtml(paymentType, data.data), 'success', true);
                     form.reset();
                     document.getElementById('recurring-fields').style.display = 'none';
                 } else {
@@ -264,7 +264,7 @@
         function buildSuccessHtml(paymentType, d) {
             const isRecurring = paymentType === 'recurring';
             const typeLabel = isRecurring
-                ? 'Recurring Donation (' + capitalize(d.frequency) + ')'
+                ? 'Recurring Donation (' + escHtml(capitalize(d.frequency)) + ')'
                 : 'One-Time Donation';
             const amount = parseFloat(d.amount).toFixed(2);
 
@@ -273,21 +273,21 @@
 
             html += '<tr><td colspan="2" style="padding:6px 0 2px;font-weight:600;border-bottom:1px solid rgba(0,0,0,0.1);">Donation Summary</td></tr>';
             html += row('Type', typeLabel);
-            html += row('Amount', (d.currency || 'USD') + ' ' + amount);
+            html += row('Amount', escHtml(d.currency || 'USD') + ' ' + escHtml(amount));
             const donorName = d.firstName && d.lastName ? d.firstName + ' ' + d.lastName : (d.donorName || '');
             html += row('Donor', escHtml(donorName) + ' &lt;' + escHtml(d.donorEmail) + '&gt;');
 
             html += '<tr><td colspan="2" style="padding:10px 0 2px;font-weight:600;border-bottom:1px solid rgba(0,0,0,0.1);">Transaction Details</td></tr>';
             if (isRecurring) {
-                html += row('Schedule Key', '<code>' + d.scheduleKey + '</code>');
-                html += row('Customer Key', '<code>' + d.customerKey + '</code>');
-                html += row('Frequency', capitalize(d.frequency));
-                html += row('Start Date', d.startDate);
+                html += row('Schedule Key', '<code>' + escHtml(d.scheduleKey) + '</code>');
+                html += row('Customer Key', '<code>' + escHtml(d.customerKey) + '</code>');
+                html += row('Frequency', escHtml(capitalize(d.frequency)));
+                html += row('Start Date', escHtml(d.startDate));
             } else {
-                html += row('Transaction ID', '<code>' + d.transactionId + '</code>');
-                html += row('Status', d.status);
+                html += row('Transaction ID', '<code>' + escHtml(d.transactionId) + '</code>');
+                html += row('Status', escHtml(d.status));
             }
-            html += row('Processed', d.timestamp);
+            html += row('Processed', escHtml(d.timestamp));
 
             html += '</table>';
             return html;
@@ -305,7 +305,7 @@
         }
 
         function escHtml(s) {
-            return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         document.querySelectorAll('input[name="payment_type"]').forEach(radio => {
@@ -320,13 +320,14 @@
             });
         });
 
-        function showMessage(message, type) {
+        // message is plain text unless isHtml is set, server and gateway messages never go in as markup
+        function showMessage(message, type, isHtml) {
             const container = document.getElementById('message-container');
             const alertClass = type === 'success' ? 'gp-alert-success' : 'gp-alert-error';
 
             container.innerHTML = `
                 <div class="gp-alert ${alertClass}" style="margin-bottom: 20px;">
-                    <strong>${type === 'success' ? 'Success!' : 'Error:'}</strong> ${message}
+                    <strong>${type === 'success' ? 'Success!' : 'Error:'}</strong> ${isHtml ? message : escHtml(message)}
                 </div>
             `;
 
